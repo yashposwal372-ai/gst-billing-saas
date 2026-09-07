@@ -1,159 +1,87 @@
-# Turborepo starter
+# GST Billing & Business Management SaaS
 
-This Turborepo starter is maintained by the Turborepo core team.
+Phase 1 foundation for Indian business billing and management. No authentication or business features are implemented.
 
-## Using this example
+## Architecture
 
-Run the following command:
-
-```sh
-npx create-turbo@latest
+```text
+Next.js :3000 (apps/web)
+    -> NestJS REST :4000/api/v1 (apps/api)
+        -> Prisma -> PostgreSQL (source of truth)
+        -> Redis (cache infrastructure)
+        -> BullMQ producers -> Redis (future workers)
+packages/ -> shared UI, ESLint, TypeScript
 ```
 
-## What's inside?
+NestJS owns database access and business logic. Next.js never connects to PostgreSQL or receives backend secrets. Future financial/inventory writes must use transactions where required; tenant records must enforce business isolation and justified indexes.
 
-This Turborepo includes the following packages/apps:
+## Requirements and installation
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Node >=24 (verified 24.19.0), npm 11.17.0, and Docker with Compose for local PostgreSQL/Redis. Run from the repository root:
 
 ```sh
-cd my-turborepo
-turbo build
+npm install
+npm run prisma:generate --workspace api
 ```
 
-Without global `turbo`, use your package manager:
+On Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
+
+## Environment setup
+
+Copy `apps/api/.env.example` to `apps/api/.env` and `apps/web/.env.example` to `apps/web/.env.local`. Optionally copy root `.env.example` to `.env` to customize Compose. These local files are ignored; examples are tracked.
+
+Backend local defaults match Compose: port 4000, frontend origin http://localhost:3000, database gst_billing with development-only gst_dev/gst_dev_local credentials, and redis://localhost:6379. If you change Compose ports or credentials, update API URLs too. npm workspace commands run in apps/api, where ConfigModule and Prisma CLI load .env.
+
+JWT_SECRET and JWT_REFRESH_SECRET are unused Phase 2 placeholders and may be empty locally. Production requires explicit infrastructure/origin settings and distinct non-placeholder secrets of at least 32 characters. Production frontend origin must use HTTPS. Never use the local example credentials in production. Validation errors list variable names, never values.
+
+Only NEXT_PUBLIC_API_URL belongs in the frontend environment. The Zod-validated getApiBaseUrl helper is in apps/web/lib/api.ts. Never expose DATABASE_URL, REDIS_URL, or JWT secrets there.
+
+## Local services and development
 
 ```sh
-cd my-turborepo
-npx turbo build
-npm exec turbo build
-npm exec turbo build
+docker compose up -d
+docker compose ps
+npm run infra:check --workspace api
+npm run dev
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Compose runs PostgreSQL 17 and Redis 7 with healthchecks and persistent volumes, bound to loopback. Redis uses append-only persistence and noeviction for BullMQ compatibility. Services run in Docker; Next.js and NestJS run on the host.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+- Frontend: http://localhost:3000
+- API: http://localhost:4000/api/v1
+- Liveness: http://localhost:4000/api/v1/health
+- Preserved starter response: GET /api/v1
+
+Health returns `{"status":"ok","service":"gst-billing-api"}`; it does not assert database/cache readiness. Connections are lazy so health, builds and tests work without services. `infra:check` explicitly executes SELECT 1 through Prisma and Redis PING, returning nonzero if unavailable. Redis producer requests have bounded retries; future workers require separate retrying connections. No queues or workers start until a queue is explicitly requested.
+
+Stop apps with Ctrl+C. Stop containers with `docker compose stop`; keep volumes unless you deliberately intend to delete local data.
+
+## Validation and schema commands
 
 ```sh
-turbo build --filter=docs
+npm run lint
+npm run typecheck
+npm run build
+npm run test --workspace api
+npm run test:e2e --workspace api
+npm run prisma:validate --workspace api
+npm audit
+npm audit --omit=dev
+git diff --check
 ```
 
-Without global `turbo`:
+`check-types` remains supported. API build/dev/typecheck and start/e2e prehooks generate the Prisma client. After a build, `npm run start:prod --workspace api` starts compiled code. Prisma 7 uses prisma.config.ts and the PostgreSQL driver adapter; generated TypeScript is ignored and compiled into API dist. The schema intentionally has no business models or migrations. In Phase 2, use `npm run prisma:migrate --workspace api -- --name <name>` after designing authorized models and starting PostgreSQL.
 
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
-```
+Tailwind 4 uses @tailwindcss/postcss and CSS imports; existing App Router/CSS modules remain. Zod validates frontend API configuration. No frontend form/test framework was added.
 
-### Develop
+## Verified status and limitations (2026-09-07)
 
-To develop all apps and packages, run the following command:
+Builds, lint, typechecks, 14 unit tests and 4 e2e tests passed during implementation. Root dev served HTTP 200 on ports 3000 and 4000. A Windows sandbox denied Nest watch process termination during shutdown; a second interrupt stopped the task tree, and subsequent inspection found no remaining app listeners/processes.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Docker/psql/redis-server are not available on PATH and no local database/cache listeners were observed. Compose YAML syntax was parsed using the installed Prettier YAML parser; Docker Compose runtime/schema validation and PostgreSQL/Redis/BullMQ runtime connectivity were NOT RUN. App Dockerfiles are deferred to the deployment phase.
 
-```sh
-cd my-turborepo
-turbo dev
-```
+npm audit reports 9 packages: 2 low, 1 moderate, 6 high. Production-only audit reports 4 high through Prisma, @prisma/config, deepmerge-ts and mysql2. Although Prisma CLI is declared a devDependency, @prisma/client's optional peer causes npm to include it in the production audit. Do not describe production audit as clean. The other 5 findings are in the existing @nestjs/mau development tree. Prisma pins affected transitive versions; no forced downgrade, prerelease upgrade, or override was applied.
 
-Without global `turbo`, use your package manager:
+npm also warns of unapproved dependency lifecycle scripts for Prisma, its engines, and optional msgpackr-extract. Generation/build/tests work in this environment; no blanket script approval was added. Vitest reports the existing vite-tsconfig-paths native-support warning.
 
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Phase 2 (Authentication + Business Onboarding) requires separate authorization.

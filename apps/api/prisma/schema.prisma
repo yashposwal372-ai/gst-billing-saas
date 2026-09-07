@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Business models and migrations begin in Phase 2.
+// PostgreSQL is the source of truth; only NestJS accesses it.
+// Future tenant records require business isolation, justified indexes,
+// and transactions for financial/inventory consistency where required.
