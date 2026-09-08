@@ -4,6 +4,105 @@ generator client {
   moduleFormat = "esm"
 }
 
+enum ItemType {
+  PRODUCT
+  SERVICE
+}
+
+enum ItemUnit {
+  PCS
+  NOS
+  KG
+  G
+  LTR
+  ML
+  MTR
+  BOX
+  PACK
+  SET
+  HOUR
+  DAY
+  SERVICE
+}
+
+enum StockMovementType {
+  OPENING
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  name        String    @db.VarChar(120)
+  nameKey     String    @db.VarChar(120)
+  description String?   @db.VarChar(1000)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, nameKey])
+  @@index([businessId, isActive, name])
+}
+
+model Product {
+  id             String          @id @default(uuid()) @db.Uuid
+  businessId     String          @db.Uuid
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  productCode    String          @db.VarChar(20)
+  type           ItemType
+  name           String          @db.VarChar(160)
+  description    String?         @db.VarChar(2000)
+  categoryId     String?         @db.Uuid
+  category       Category?       @relation(fields: [categoryId, businessId], references: [id, businessId], onDelete: Restrict)
+  sku            String?         @db.VarChar(80)
+  barcode        String?         @db.VarChar(100)
+  hsnSacCode     String?         @db.VarChar(8)
+  gstRate        Decimal         @default(0) @db.Decimal(5, 2)
+  unit           ItemUnit
+  purchasePrice  Decimal         @default(0) @db.Decimal(15, 2)
+  salePrice      Decimal         @default(0) @db.Decimal(15, 2)
+  mrp            Decimal?        @db.Decimal(15, 2)
+  trackInventory Boolean         @default(false)
+  openingStock   Decimal         @default(0) @db.Decimal(18, 3)
+  currentStock   Decimal         @default(0) @db.Decimal(18, 3)
+  minimumStock   Decimal?        @db.Decimal(18, 3)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  movements      StockMovement[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, productCode])
+  @@unique([businessId, sku])
+  @@unique([businessId, barcode])
+  @@index([businessId, isActive, type])
+  @@index([businessId, name])
+  @@index([businessId, categoryId])
+}
+
+model StockMovement {
+  id          String            @id @default(uuid()) @db.Uuid
+  businessId  String            @db.Uuid
+  business    Business          @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  productId   String            @db.Uuid
+  product     Product           @relation(fields: [productId, businessId], references: [id, businessId], onDelete: Restrict)
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(18, 3)
+  beforeStock Decimal           @db.Decimal(18, 3)
+  afterStock  Decimal           @db.Decimal(18, 3)
+  reason      String            @db.VarChar(500)
+  createdById String            @db.Uuid
+  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now())
+
+  @@index([businessId, productId, createdAt])
+  @@index([createdById])
+}
+
 enum CustomerType {
   INDIVIDUAL
   BUSINESS
@@ -125,6 +224,7 @@ enum GstMode {
 }
 
 model User {
+  stockMovements          StockMovement[]
   id                      String                   @id @default(uuid()) @db.Uuid
   email                   String                   @unique @db.VarChar(254)
   mobile                  String?                  @db.VarChar(16)
@@ -200,6 +300,10 @@ model EmailVerificationToken {
 // Only NestJS accesses tenant data. Future financial operations require
 // transactions and business-scoped queries/indexes, designed in their phases.
 model Business {
+  categories            Category[]
+  products              Product[]
+  stockMovements        StockMovement[]
+  nextProductNumber     Int              @default(0)
   customers             Customer[]
   suppliers             Supplier[]
   nextCustomerNumber    Int              @default(0)

@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
 import type { SafeUser } from '../users/user.select.js';
+import { ownerScope } from '../parties/party.data.js';
 import { dashboardFilter, type DashboardQuery } from './dashboard.query.js';
 
 @Injectable()
@@ -12,6 +13,8 @@ export class DashboardService {
     let business: { id: string; name: string; role: 'OWNER'; onboardingCompleted: boolean } | null = null;
     let customers: number | null = null;
     let suppliers: number | null = null;
+    let products: number | null = null;
+    let lowStock: number | null = null;
     if (user.currentBusinessId) {
       const membership = await this.db.businessMember.findUnique({
         where: { userId_businessId: { userId: user.id, businessId: user.currentBusinessId } },
@@ -24,12 +27,17 @@ export class DashboardService {
         onboardingCompleted: Boolean(membership.business.onboardingCompletedAt) };
       customers = membership.business._count.customers;
       suppliers = membership.business._count.suppliers;
+      const scope = {...ownerScope(user), isActive:true, type:'PRODUCT' as const};
+      [products,lowStock] = await Promise.all([
+        this.db.product.count({where:scope}),
+        this.db.product.count({where:{...scope,trackInventory:true,currentStock:{gt:0,lte:this.db.product.fields.minimumStock}}}),
+      ]);
     }
     return {
       business, filter, dataStatus: 'not_available' as const,
       metrics: { todaySales: null, monthlySales: null, totalSales: null, totalPurchases: null,
         totalExpenses: null, totalGst: null, receivables: null, customers, suppliers,
-        products: null, lowStock: null, overdueInvoices: null },
+        products, lowStock, overdueInvoices: null },
       recentActivity: [],
       charts: { sales: [], gst: [], invoiceStatus: [], paymentMethods: [], topProducts: [] },
     };

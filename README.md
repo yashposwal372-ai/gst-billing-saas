@@ -1,6 +1,6 @@
 # GST Billing & Business Management SaaS
 
-Phase 4 adds customer and supplier management to the existing authentication, onboarding and application shell. Inventory and financial modules remain future work. Live PostgreSQL/Redis verification is outstanding.
+Phase 5 adds a unified product/service catalogue, categories and stock adjustments to the existing authentication, onboarding, dashboard and party management. Financial modules remain future work. Live PostgreSQL/Redis verification is outstanding.
 
 ## Architecture
 
@@ -116,6 +116,41 @@ Validation: lint, typecheck and build passed; 88 unit and 104 HTTP/e2e tests pas
 
 Run `node apps/web/scripts/dashboard-smoke.mjs --parties` after building, with port 3000 free, for fixture-based browser checks of lists/forms/details/dialogs at 1440/1024/768/375px plus validation/create/edit/status/filter/error flows. It uses the existing Chrome/Edge approach and stops its own processes. These checks passed but do not verify live persistence.
 
+## Phase 5 products and inventory (2026-09-08)
+
+Frontend routes: `/products`, `/products/new`, `/products/:id`, `/products/:id/edit`, `/categories`, and `/inventory`. Products, Categories and Stock navigation and Add product are enabled. Lists have search, filters, sorting and pagination; detail pages show SKU/barcode, pricing, stock and paginated movement history. Category dialogs support create/edit/deactivate/reactivate. Product detail supports confirmed status changes and explained stock adjustments.
+
+All API paths below are relative to `/api/v1` and require the authenticated user's current OWNER business. Writes retain Origin/CSRF checks. Unknown DTO/query properties, including client business IDs and product codes, are rejected.
+
+| Methods | Path | Behavior |
+| --- | --- | --- |
+| GET, POST | `/categories` | Paginated list / create |
+| GET, PATCH, DELETE | `/categories/:id` | Detail / partial edit / deactivate |
+| GET, POST | `/products` | Paginated catalogue / create PRODUCT or SERVICE |
+| GET, PATCH, DELETE | `/products/:id` | Detail / partial edit / deactivate |
+| GET | `/products/by-barcode/:barcode` | Exact business-scoped barcode lookup |
+| GET | `/inventory/summary` | Active product, tracked, low-stock and out-of-stock counts |
+| POST | `/products/:id/stock-adjustments` | Transactional stock increase/decrease |
+| GET | `/products/:id/stock-movements` | Immutable paginated history |
+
+PATCH `{"isActive":true}` reactivates categories/items; DELETE never physically deletes them. Product lists accept `page`, `pageSize` (default 20, max 100), `search`, `status=active|inactive|all`, `type=PRODUCT|SERVICE`, `categoryId`, `gstRate`, `stockStatus=all|tracked|low|out`, `sortBy=name|productCode|createdAt|salePrice|currentStock` and `sortOrder=asc|desc`. Category lists accept pagination, status and search. Movement lists accept pagination and optional `type=OPENING|ADJUSTMENT_IN|ADJUSTMENT_OUT`.
+
+Category names are case-insensitively unique within a business. Optional trimmed SKU and barcode are case-sensitive and business-unique; empty strings clear optional values. Codes use `PRD-000001` onward, allocated by an atomic business counter in the same transaction as item creation and opening stock. A failed transaction rolls back the counter and records together; live concurrency remains unverified.
+
+PRODUCT items may track inventory; SERVICE items cannot carry stock or accept adjustments. Type, unit and tracking mode are fixed after creation. Units: PCS, NOS, KG, G, LTR, ML, MTR, BOX, PACK, SET, HOUR, DAY, SERVICE; no unit conversion. HSN accepts 4/6/8 digits, SAC accepts 6 digits starting with 99. GST rate accepts 0–100 with up to two decimals. These are format checks, not official classification/rate verification or tax calculation.
+
+Send prices as nonnegative decimal strings with up to two decimals (Decimal(15,2)); quantities use up to three decimals (Decimal(18,3)). Responses serialize prices/rates with two places and quantities with three. Stock source of truth is Product.currentStock plus append-only StockMovement records. Nonzero opening stock creates an OPENING movement in the creation transaction; zero stock creates none. Normal PATCH rejects opening/current stock fields. Adjustments use `{"direction":"INCREASE","quantity":"0.001","reason":"Physical count correction"}` or DECREASE, with exact Decimal arithmetic, Serializable transactions, bounded conflict retries and conditional stock updates. Quantity must be positive; negative resulting stock and overflow are rejected. Each movement records quantity, before/after stock, reason, actor and time. There are no movement update/delete endpoints.
+
+Low stock means `currentStock > 0 && currentStock <= minimumStock`; out of stock means `currentStock <= 0`. Both exclude inactive items, services and untracked products. Dashboard product/low-stock counts are authorized current counts, independent of date selection; financial metrics remain null and charts empty. Out-of-stock count appears in inventory summary only.
+
+Migration `20260908180000_phase5_products_inventory` adds Category, Product, StockMovement, enums, scoped constraints/indexes and Business.nextProductNumber. Prisma format/validate/generate passed, and a fresh offline Phase 4-to-5 diff exactly matches the migration. **Migration application: NOT RUN.** Use the existing deploy command only against a configured PostgreSQL database when available; no reset is needed.
+
+Backend verification: 141 unit tests passed; 178 HTTP/e2e tests passed; 4 real PostgreSQL tests skipped without `TEST_DATABASE_URL`. The opt-in catalogue suite targets a migrated dedicated `*_test` database and covers code allocation, rollback, decimals, tenant isolation and concurrent decrements. Mock tests do not verify persistence or actual concurrency.
+
+Run `node apps/web/scripts/dashboard-smoke.mjs --catalogue` after building with port 3000 free. Fixture-backed browser checks passed at 1440/1024/768/375px for pages/dialogs, long names/SKU/barcode, overflow, keyboard containment/Escape/restoration, category/status flows, product/service create/edit, exact stock adjustments, negative-stock errors, history, search/filters/pagination and loading/error/retry/empty/conflict states. The prior edit stall was an incorrect fixture PATCH response (empty optional money instead of null), corrected to match the API. Existing dashboard and party browser regression checks passed. Screenshots were inspected; these checks do not verify real authentication or database persistence.
+
+Known UI limits: category selectors load the first 100 categories; unsaved-change protection covers reload/close and Cancel, not all in-app links. No barcode scanning/printing UI, stock valuation, unit conversion or financial transactions are implemented.
+
 ## Infrastructure and dependency limitations
 
 Phase 1 previously verified root dev serving on ports 3000 and 4000; watch restart was not verified. Phase 2 runtime checks used compiled servers.
@@ -126,4 +161,4 @@ npm audit reports 9 packages: 2 low, 1 moderate, 6 high. Production-only audit r
 
 npm also warns of unapproved dependency lifecycle scripts for Prisma, its engines, and optional msgpackr-extract. Generation/build/tests work in this environment; no blanket script approval was added. Vitest reports the existing vite-tsconfig-paths native-support warning.
 
-Phase 4 implementation is complete with the runtime limitations above. Phase 5 (Products + Inventory) has not started and requires separate authorization.
+Phase 5 implementation and feasible validation are complete with the runtime limitations above. Phase 6 (GST Billing + Invoice Generation) has not started and requires separate authorization.

@@ -2,7 +2,7 @@
 
 ## Locked product and architecture
 
-Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation and customer/supplier management are implemented through Phase 4. Inventory, billing, payments, accounting, reports, portals, staff, AI, subscriptions and administration remain future work.
+Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation, customer/supplier management and products/inventory are implemented through Phase 5. Billing, payments, accounting, reports, portals, staff, AI, subscriptions and administration remain future work.
 
 - Frontend: Next.js + React + TypeScript + Tailwind CSS in apps/web, with Zod validation.
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
@@ -11,7 +11,27 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
 
-## Verified Phase 4 implementation: 2026-09-08
+## Verified Phase 5 implementation: 2026-09-08
+
+- Continued the existing Phase 5 working tree above Phase 4 checkpoint 8e2b15b19c9b7e9e42b47efc14a49b0cef56ccef. Preserved implementation; no reset, cleanup, commit, push or Phase 6 work.
+- Category, unified Product (PRODUCT/SERVICE), immutable StockMovement, ItemType/ItemUnit/StockMovementType enums and Business.nextProductNumber are implemented. Category nameKey is case-insensitively unique per business. Product code, optional trimmed case-sensitive SKU and barcode are business-unique. Composite category/product tenant foreign keys and restrictive deletion preserve associations/history.
+- Product codes use PRD-000001 onward; atomic counter increment, insert and nonzero opening movement share one transaction. Rollback and concurrent allocation are designed transactionally but remain unverified on real PostgreSQL.
+- Prices use Decimal(15,2), GST rates Decimal(5,2), quantities Decimal(18,3). DTOs reject numeric JSON, negative/exponent/overprecision amounts; API serializes fixed two/three-place strings. Exact Prisma Decimal arithmetic avoids JS float stock calculation. HSN supports 4/6/8 digits; SAC 6 digits starting 99; GST 0–100 with up to two decimals. Format checks only, not government classification/rate verification or invoice calculation.
+- Units: PCS/NOS/KG/G/LTR/ML/MTR/BOX/PACK/SET/HOUR/DAY/SERVICE. Type, unit and inventory tracking are fixed after creation. Services cannot track stock or accept adjustments. Untracked items reject stock inputs. No unit conversion, valuation, warehouse, batch, serial, transfer or financial models.
+- Product.currentStock plus append-only StockMovement is the stock source of truth. InventoryService owns authoritative writes: nonzero opening stock creates OPENING; zero opening creates no movement. Normal PATCH rejects openingStock/currentStock. Adjustments require active tracked PRODUCT, positive quantity and reason; Serializable transactions retry P2034 at most three attempts, use conditional current-stock updates, reject negative/overflow results, and record quantity/before/after/reason/actor/time atomically. No movement mutation endpoints. DELETE deactivates; PATCH isActive:true reactivates without removing history.
+- CatalogueModule uses existing AuthGuard/BrowserWriteGuard, exact Origin/CSRF and safe API error handling. Trusted current-business OWNER scopes apply to catalogue/category/history/summary queries and writes; client tenant/code and unknown DTO/query properties are rejected. UUID IDs are validated. Auth, refresh rotation, revocation, cookies, CORS and rate limiting were not changed.
+- Under /api/v1: categories and products expose GET/POST collection and GET/PATCH/DELETE :id; GET /products/by-barcode/:barcode; POST /products/:id/stock-adjustments; GET /products/:id/stock-movements; GET /inventory/summary. Lists use bounded database pagination, stable ordering and RepeatableRead snapshots. Product filters include search/status/type/category/GST/stock/sort; history filters by movement type. Category inclusion avoids N+1 reads.
+- Low stock: active tracked PRODUCT with currentStock > 0 and <= minimumStock. Out of stock: same eligibility and currentStock <= 0. Services/inactive/untracked items excluded; boundary unit tests cover threshold equality and zero. Dashboard returns current authorized active PRODUCT and low-stock counts, independent of date filter. Out-of-stock count only in inventory summary; financial metrics remain null, charts/activity empty.
+- Frontend /products, /products/new, /products/:id, /products/:id/edit, /categories and /inventory use existing authenticated shell. Products/Categories/Stock and Add product enabled; future features disabled. Reusable forms/dialogs, inline errors, labels/error associations, semantic responsive tables, status text, loading/error/retry, search/filter/pagination and movement history are implemented. Category selectors currently load first 100 categories. Unsaved-change warning covers reload/close and Cancel only.
+- Prior browser edit stall reproduced: fixture PATCH retained empty mrp instead of backend null, so Zod rejected the response and the form showed a save error. Corrected fixture optional-value normalization; application save flow required no rewrite. Added explicit category/stock dialog keyboard restoration/containment checks, maximum-length SKU/barcode fixtures and separate duplicate SKU/barcode cases. Corrected smoke completion logging to avoid claiming dashboard checks during catalogue-only runs.
+- Fixture-backed catalogue pages/forms/detail/category/inventory/dialogs passed at 1440/1024/768/375px, including long identifiers, no horizontal overflow, create PRODUCT/SERVICE, edit created item, status/category flows, IN/OUT precision, negative rejection, movement history, filters/search/pagination, loading/error/retry/empty/conflicts. Screenshots inspected. Dashboard and customer/supplier regression browser runs passed. Chrome renderer timeout inside sandbox required approved outside-sandbox execution. These checks do not verify live auth or persistence.
+- Root lint/typecheck/build passed. Unit tests: 141 passed. HTTP/e2e: 178 passed; four real PostgreSQL tests skipped across three files. Opt-in catalogue database tests cover concurrent codes, duplicate rollback, decimals/isolation and concurrent decrements/history; not executed here.
+- Final rebuilt catalogue browser run passed including separate duplicate SKU/barcode errors. Compiled API root/health returned 200; unauthenticated products/categories/inventory summary/barcode lookup returned 401. Smoke app listeners stopped (ports 3000/4000 free). git diff --check passed with only existing Windows line-ending conversion notices.
+- Migration 20260908180000_phase5_products_inventory generated offline and inspected; exact equality with fresh Phase 4-to-5 schema diff confirmed. Prisma format/validate/generate passed. Migration application NOT RUN; no database reset.
+- Docker/psql/redis-server unavailable on PATH; localhost PostgreSQL :5432 and Redis :6379 unavailable. Persistence, actual rollback/concurrency, migration runtime and Redis/BullMQ runtime remain unverified. Full audit: 9 (2 low, 1 moderate, 6 high); production: 4 high. Registry audit required approved network retry; no forced fixes/upgrades or dependency changes. Existing Vitest tsconfig plugin warning remains.
+- Phase 6 requires explicit new authorization. Historical sections below are superseded by this section where applicable.
+
+## Historical Phase 4 implementation: 2026-09-08
 
 - Started from approved clean Phase 3 checkpoint c1eaa397ba2555a343f5d104d3f6e5e0df01cfeb. Phase 4 was reviewed and approved for checkpoint creation; no push, reset, unrelated cleanup or Phase 5 implementation.
 - Customer and Supplier each belong to one Business, with business-scoped unique code and optional GSTIN. Both store contact/tax/address/terms/notes/status and decimal opening balance/direction. Customer adds type, shipping address and credit limit; Supplier adds optional bank fields. Customer addressLine1/addressLine2/city/state/stateCode/pincode represent the billing address.
@@ -99,7 +119,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 2. Authentication + Business onboarding (implemented; runtime limitations above; stop here).
 3. Dashboard + Navigation (implemented; runtime limitations above; stop here).
 4. Customers + Suppliers (implemented; runtime limitations above; stop here).
-5. Products + Inventory.
+5. Products + Inventory (implemented; runtime limitations above; stop here).
 6. GST Billing + Invoice Generation.
 7. Sales + Purchases.
 8. Payments + Expenses + Banking.
@@ -115,7 +135,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 18. Security + Performance + Testing.
 19. Docker + Production Deployment.
 
-Stop after the explicitly requested task/phase. Phase 5 requires new user authorization.
+Stop after the explicitly requested task/phase. Phase 6 requires new user authorization.
 
 ## Implementation rules
 

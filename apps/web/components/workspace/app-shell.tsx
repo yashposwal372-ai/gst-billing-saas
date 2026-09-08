@@ -17,6 +17,8 @@ function containDialogFocus(event: ReactKeyboardEvent<HTMLDialogElement>) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 }
 
+const destinations: Record<string,string> = {Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory"};
+
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { summary } = useWorkspace();
@@ -32,9 +34,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <Link key={item.label} href={item.href} className={styles.navItem} aria-current={pathname === item.href ? "page" : undefined} onClick={onNavigate}>
           <Icon name={item.icon} /><span>{item.label}</span>{pathname === item.href && <span className={styles.activeDot} />}
         </Link> : item.children ?
-          <details key={item.label} className={styles.navGroup} open={item.label === "Parties" && (pathname.startsWith("/customers") || pathname.startsWith("/suppliers")) ? true : undefined}>
+          <details key={item.label} className={styles.navGroup} open={item.children.some(child => destinations[child] && pathname.startsWith(destinations[child])) ? true : undefined}>
             <summary className={styles.navItem}><Icon name={item.icon} /><span>{item.label}</span><Icon name="chevron" className={styles.groupChevron} /></summary>
-            <div className={styles.navChildren}>{item.children.map((child) => child === "Customers" || child === "Suppliers" ? <Link key={child} href={"/" + child.toLowerCase()} aria-current={pathname.startsWith("/" + child.toLowerCase()) ? "page" : undefined} onClick={onNavigate}>{child}</Link> : <button key={child} disabled>{child}<small>Soon</small></button>)}</div>
+            <div className={styles.navChildren}>{item.children.map((child) => destinations[child] ? <Link key={child} href={destinations[child]!} aria-current={pathname.startsWith(destinations[child]!) ? "page" : undefined} onClick={onNavigate}>{child}</Link> : <button key={child} disabled>{child}<small>Soon</small></button>)}</div>
           </details> : <button key={item.label} className={styles.navItem} disabled><Icon name={item.icon} /><span>{item.label}</span><small>Soon</small></button>)}
     </nav>
     <div className={styles.sidebarFoot}><span className={styles.statusDot} /><span>Your business, organized.<small>Account & workspace foundation</small></span></div>
@@ -72,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={styles.mainColumn}>
       <header className={styles.topbar}>
         <button className={`${styles.iconButton} ${styles.mobileTrigger}`} aria-label="Open navigation" aria-haspopup="dialog" onClick={() => drawer.current?.showModal()}><Icon name="menu" /></button>
-        <div className={styles.breadcrumb}><span>Workspace</span><Icon name="chevron" /><strong>{pathname.startsWith("/customers") ? "Customers" : pathname.startsWith("/suppliers") ? "Suppliers" : "Dashboard"}</strong></div>
+        <div className={styles.breadcrumb}><span>Workspace</span><Icon name="chevron" /><strong>{Object.entries(destinations).find(([,path])=>pathname.startsWith(path))?.[0] ?? "Dashboard"}</strong></div>
         <div className={styles.topbarActions}>
           <div className={styles.search}><Icon name="search" /><input aria-label="Global search (coming soon)" placeholder="Search invoices, customers, products..." disabled /><span>Soon</span></div>
           <button className={styles.iconButton} aria-label="Notifications (coming soon)" aria-haspopup="dialog" onClick={() => notice.current?.showModal()}><Icon name="bell" /></button>
