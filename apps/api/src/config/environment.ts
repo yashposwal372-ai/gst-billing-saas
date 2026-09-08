@@ -51,6 +51,8 @@ export function validateEnvironment(
     ),
   );
   const invalid = new Set(validateSync(config).map((error) => error.property));
+  if (config.JWT_SECRET && (config.JWT_SECRET.length < 32 || /placeholder|change.me|replace/i.test(config.JWT_SECRET)))
+    invalid.add('JWT_SECRET');
   for (const [key, protocols] of [
     ['FRONTEND_URL', ['http:', 'https:']],
     ['DATABASE_URL', ['postgres:', 'postgresql:']],

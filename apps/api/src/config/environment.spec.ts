@@ -7,10 +7,10 @@ describe('environment validation', () => {
       FRONTEND_URL: 'http://localhost:3000',
     });
   });
-  it('transforms ports and preserves Phase 2 placeholders', () => {
+  it('transforms ports and accepts a strong signing secret', () => {
     expect(
-      validateEnvironment({ PORT: '4100', JWT_SECRET: 'placeholder' }),
-    ).toMatchObject({ PORT: 4100, JWT_SECRET: 'placeholder' });
+      validateEnvironment({ PORT: '4100', JWT_SECRET: 'a'.repeat(40) }),
+    ).toMatchObject({ PORT: 4100, JWT_SECRET: 'a'.repeat(40) });
   });
   it.each([
     { PORT: 'abc' },

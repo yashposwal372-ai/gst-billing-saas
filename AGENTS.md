@@ -2,7 +2,7 @@
 
 ## Locked product and architecture
 
-Build a production-oriented SaaS for Indian businesses, phase by phase. Eventual scope includes GST billing, business documents, parties, inventory, payments, accounting, reports, portals, staff, AI, subscriptions, and administration. These product features are not implemented.
+Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication and business onboarding are implemented through Phase 2. Eventual scope includes GST billing, business documents, parties, inventory, payments, accounting, reports, portals, staff, AI, subscriptions, and administration. These later product features are not implemented.
 
 - Frontend: Next.js + React + TypeScript + Tailwind CSS in apps/web, with Zod validation.
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
@@ -11,7 +11,25 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Eventual
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
 
-## Verified Phase 1 implementation: 2026-09-07
+## Verified Phase 2 implementation: 2026-09-08
+
+- Continued the existing Phase 2 working tree; no authentication rewrite, reset, commit, push or Phase 3 work. The Phase 1 section below is historical; this section supersedes its auth/schema/test status.
+- Argon2id via @node-rs/argon2: memoryCost 19456 KiB, timeCost 2, parallelism 1. jose signs HS256 access JWTs with issuer/audience checks and 15-minute expiry. Missing local JWT_SECRET generates a per-process key. JWT_REFRESH_SECRET is unused but retained in existing production configuration validation.
+- Refresh tokens use 32 cryptographically random bytes and SHA-256 hash storage. AuthSession has a fixed 30-day expiry; rotation consumes a token atomically in a Serializable transaction with bounded P2034 retries. Replay commits session revocation. Guards check active user, session expiry/revocation and authVersion on every authenticated request. Logout revokes the session; password reset increments authVersion and revokes all sessions.
+- Access and refresh cookies are HttpOnly, SameSite=Lax, host-only; production uses Secure and __Host-/__Secure- names. Access path is /; refresh path is /api/v1/auth. Cookie clearing matches paths/options. Production requires a same-site HTTPS frontend/API deployment. CORS permits only the configured frontend origin with credentials; all auth/business writes require exact Origin plus X-CSRF-Protection: 1.
+- express-rate-limit limits auth writes to 30/IP/15 minutes, excluding GET/OPTIONS; in-memory store only. Distributed limiting and proxy configuration are not implemented. Safe user selection omits hashes/status/version. Error logging omits payloads/secrets.
+- Prisma models: User, AuthSession, RefreshToken, PasswordResetToken, EmailVerificationToken, Business, BusinessMember. Unique normalized email, GSTIN, token hashes and user/business membership; expiry and relation indexes. User deletion cascades auth/membership records; business deletion cascades memberships and sets currentBusinessId null. No later-phase models.
+- Business creation, OWNER membership and conditional currentBusinessId assignment share a transaction. Current-business read/update enforce trusted user ID, current business and OWNER membership; client tenant assignment is rejected. Onboarding stores address/GST/default invoice/bank details with backend DTO and cross-field validation; no government/bank verification or billing logic.
+- Auth API under /api/v1: POST /auth/signup, /auth/login, /auth/refresh, /auth/logout, /auth/forgot-password, /auth/reset-password, /auth/verify-email, /auth/request-verification; GET /auth/me. Business API: POST /businesses, GET /businesses/current, PATCH /businesses/current (full DTO).
+- Frontend routes: /signup, /login, /forgot-password, /reset-password, /verify-email, /onboarding, /welcome. React auth context supports loading/authenticated/unauthenticated/error states; credentials included, one refresh promise per tab and Web Locks where available, retry and logout. Tokens are not stored in browser JS storage. Three-step onboarding and minimal completion page only; root starter preserved. Source-reviewed responsive layout, labels and keyboard controls; no interactive browser verification.
+- Reset tokens expire after 30 minutes, verification after 24 hours; single-use and previous requests invalidated. Email delivery is NOT configured. Local-only auth:local-token utility now consumes tokens internally without printing them; reset password comes from redirected stdin. It refuses production/remote DB hosts. Live utility execution is unverified.
+- npm.cmd install succeeded; npm ls found no missing declared dependencies. Lockfile adds Phase 2 dependencies only. Prisma format/validate/generate passed; fresh offline migration SQL exactly matches 20260907180000_phase2_auth_onboarding. Migration application NOT RUN.
+- Root lint/typecheck/build passed. API unit: 56 passed. HTTP/e2e: 15 passed including four foundation tests; one PostgreSQL integration test skipped without TEST_DATABASE_URL (requires a migrated dedicated *_test database). Mock tests are not evidence of live transaction/concurrency behavior.
+- Compiled frontend / and all seven Phase 2 pages, API /api/v1 and /api/v1/health returned HTTP 200; smoke servers stopped. Docker/psql/redis-server unavailable on PATH; no local PostgreSQL/Redis listeners observed. PostgreSQL persistence, migration runtime, Redis/BullMQ connectivity remain unverified.
+- Fresh audits: production 4 high; full 9 (2 low, 1 moderate, 6 high), in existing Prisma and @nestjs/mau chains. Initial sandbox network failure resolved with approved audit retry. No forced fixes/upgrades. Existing pending lifecycle-script and vite-tsconfig-paths warnings remain.
+- Implementation and feasible validation complete with the above runtime/delivery limitations. Phase 3 requires explicit new authorization.
+
+## Historical Phase 1 implementation: 2026-09-07
 
 - Runtime: Node 24.19.0, npm 11.17.0. Root requires Node >=24 and declares npm 11.17.0 in devEngines. PowerShell blocks npm.ps1 here; use npm.cmd.
 - Frontend: Next.js 16.3.4, React 19.2.8, TypeScript 7.0.2. Existing App Router/CSS module starter preserved. Tailwind 4.3.3 uses PostCSS, shared UI source scanning, global typography/box-sizing/focus styles. Zod 4.5.4 validates the public API URL in apps/web/lib/api.ts.
@@ -26,7 +44,7 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Eventual
 
 ## Environment and commands
 
-Copy apps/api/.env.example to apps/api/.env and apps/web/.env.example to apps/web/.env.local. Optional root .env configures Compose. Backend defaults match local-only Compose credentials. Production requires explicit service/origin settings, HTTPS frontend origin, and distinct non-placeholder JWT secrets of at least 32 characters; JWT values are unused until Phase 2. Never commit real secrets or expose them as NEXT_PUBLIC_*.
+Copy apps/api/.env.example to apps/api/.env and apps/web/.env.example to apps/web/.env.local. Optional root .env configures Compose. Backend defaults match local-only Compose credentials. Production requires explicit service/origin settings, HTTPS frontend origin, and distinct non-placeholder JWT secrets of at least 32 characters. JWT_SECRET signs access tokens; JWT_REFRESH_SECRET remains unused with opaque refresh tokens but is still required by production validation. Never commit real secrets or expose them as NEXT_PUBLIC_*.
 
 From root: npm install; npm run prisma:generate --workspace api; docker compose up -d (when Docker available); npm run infra:check --workspace api; npm run dev.
 
@@ -34,7 +52,7 @@ Validation commands: npm run lint; npm run typecheck; npm run build; npm run tes
 
 infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero exit on failure. Health/builds/tests do not require running infrastructure. Future migrations use npm run prisma:migrate --workspace api -- --name <name> only after authorized schema changes.
 
-## Validation and remaining limitations
+## Historical Phase 1 validation and limitations
 
 - Root npm install, lint, typecheck, production build, Prisma generation/schema validation passed. API unit tests: 14 passed; e2e: 4 passed (health/prefix, CORS, Helmet, DTO transformation/rejection, lazy Redis).
 - Root dev served HTTP 200 on web :3000 and API :4000/api/v1/health. Windows sandbox blocked Nest watch process termination during shutdown; second Ctrl+C stopped Turbo, and subsequent process/port inspection found no app processes/listeners remaining. Do not claim watch restart was verified.
@@ -46,7 +64,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 ## Development phases
 
 1. Foundation and architecture (implemented, limitations above; stop here).
-2. Authentication + Business onboarding.
+2. Authentication + Business onboarding (implemented; runtime limitations above; stop here).
 3. Dashboard + Navigation.
 4. Customers + Suppliers.
 5. Products + Inventory.
@@ -65,7 +83,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 18. Security + Performance + Testing.
 19. Docker + Production Deployment.
 
-Stop after the explicitly requested task/phase. Phase 2 requires new user authorization.
+Stop after the explicitly requested task/phase. Phase 3 requires new user authorization.
 
 ## Implementation rules
 

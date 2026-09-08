@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "esm"
 }
 
@@ -8,7 +8,147 @@ datasource db {
   provider = "postgresql"
 }
 
-// Business models and migrations begin in Phase 2.
-// PostgreSQL is the source of truth; only NestJS accesses it.
-// Future tenant records require business isolation, justified indexes,
-// and transactions for financial/inventory consistency where required.
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum BusinessRole {
+  OWNER
+  MEMBER
+}
+
+enum BusinessType {
+  PROPRIETORSHIP
+  PARTNERSHIP
+  LLP
+  PRIVATE_LIMITED
+  OTHER
+}
+
+enum GstMode {
+  EXCLUSIVE
+  INCLUSIVE
+  NOT_APPLICABLE
+}
+
+model User {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  email                   String                   @unique @db.VarChar(254)
+  mobile                  String?                  @db.VarChar(16)
+  passwordHash            String
+  firstName               String                   @db.VarChar(80)
+  lastName                String                   @db.VarChar(80)
+  emailVerifiedAt         DateTime?
+  status                  UserStatus               @default(ACTIVE)
+  authVersion             Int                      @default(0)
+  currentBusinessId       String?                  @db.Uuid
+  currentBusiness         Business?                @relation("CurrentBusiness", fields: [currentBusinessId], references: [id], onDelete: SetNull)
+  memberships             BusinessMember[]
+  sessions                AuthSession[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  @@index([currentBusinessId])
+}
+
+model AuthSession {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authVersion Int
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  tokens      RefreshToken[]
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id        String      @id @default(uuid()) @db.Uuid
+  sessionId String      @db.Uuid
+  session   AuthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash String      @unique @db.Char(64)
+  usedAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  @@index([sessionId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Only NestJS accesses tenant data. Future financial operations require
+// transactions and business-scoped queries/indexes, designed in their phases.
+model Business {
+  id                    String           @id @default(uuid()) @db.Uuid
+  name                  String           @db.VarChar(160)
+  tradeName             String?          @db.VarChar(160)
+  ownerName             String           @db.VarChar(160)
+  businessType          BusinessType
+  gstRegistered         Boolean
+  gstin                 String?          @unique @db.VarChar(15)
+  pan                   String?          @db.VarChar(10)
+  mobile                String           @db.VarChar(16)
+  email                 String           @db.VarChar(254)
+  addressLine1          String           @db.VarChar(200)
+  addressLine2          String?          @db.VarChar(200)
+  state                 String           @db.VarChar(80)
+  stateCode             String           @db.Char(2)
+  city                  String           @db.VarChar(80)
+  pincode               String           @db.Char(6)
+  logoReference         String?          @db.VarChar(250)
+  invoicePrefix         String           @db.VarChar(12)
+  financialYear         String           @db.Char(7)
+  gstMode               GstMode
+  bankName              String?          @db.VarChar(120)
+  accountHolder         String?          @db.VarChar(160)
+  accountNumber         String?          @db.VarChar(34)
+  ifsc                  String?          @db.Char(11)
+  upiId                 String?          @db.VarChar(100)
+  onboardingCompletedAt DateTime
+  memberships           BusinessMember[]
+  currentUsers          User[]           @relation("CurrentBusiness")
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
+model BusinessMember {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @db.Uuid
+  businessId String       @db.Uuid
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business   Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  role       BusinessRole @default(MEMBER)
+  createdAt  DateTime     @default(now())
+
+  @@unique([userId, businessId])
+  @@index([businessId, role])
+}

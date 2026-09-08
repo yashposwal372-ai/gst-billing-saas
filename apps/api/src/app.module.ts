@@ -7,6 +7,8 @@ import { QueueModule } from './queue/queue.module.js';
 import { HealthModule } from './health/health.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AuthModule } from './auth/auth.module.js';
+import { BusinessesModule } from './businesses/businesses.module.js';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import { AppService } from './app.service.js';
     CacheModule,
     QueueModule,
     HealthModule,
+    AuthModule,
+    BusinessesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
