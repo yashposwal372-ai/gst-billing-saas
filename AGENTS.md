@@ -2,7 +2,7 @@
 
 ## Locked product and architecture
 
-Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication and business onboarding are implemented through Phase 2. Eventual scope includes GST billing, business documents, parties, inventory, payments, accounting, reports, portals, staff, AI, subscriptions, and administration. These later product features are not implemented.
+Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding and the authenticated dashboard/navigation foundation are implemented through Phase 3. Eventual scope includes GST billing, business documents, parties, inventory, payments, accounting, reports, portals, staff, AI, subscriptions, and administration. These later product features are not implemented.
 
 - Frontend: Next.js + React + TypeScript + Tailwind CSS in apps/web, with Zod validation.
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
@@ -11,7 +11,20 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
 
-## Verified Phase 2 implementation: 2026-09-08
+## Verified Phase 3 implementation: 2026-09-08
+
+- Started from approved clean Phase 2 checkpoint cc2b646383ab24b42f05ba9c56c758d89e4079be. No Phase 4 implementation, commits, pushes, resets or cleanup of unrelated files in Phase 3.
+- Added reusable apps/web/app/(app)/layout.tsx and /dashboard. Existing auth/onboarding routes were not moved. Login/signup with a current business and successful onboarding now lead to /dashboard; /welcome remains a compatibility page. Phase 2 auth provider and secure logout are reused.
+- Workspace shell: fixed desktop sidebar at >=1200px, modal drawer below that, scalable navigation data with expandable groups and disabled upcoming destinations, current authorized business display (one business only), sticky topbar, disabled search foundation, notification placeholder, account/profile/logout controls. Native dialogs include explicit Tab wrapping, Escape, focus restoration and background scroll locking. Lucide React 1.42.0 is the only new dependency; no chart dependency.
+- Dashboard: eight unavailable KPI cards, empty Sales Overview/GST Collection/Invoice Status/Payment Methods/Top Products panels, empty recent activity, disabled quick actions and a truthful profile-completion checklist. Zod-validated dashboard client reuses credentials/refresh/errors. Loading skeletons, sanitized errors/retry and onboarding redirects are implemented; no financial figures or transactions are fabricated.
+- GET /api/v1/dashboard/summary uses AuthGuard and an OWNER membership query scoped by trusted currentBusinessId/user ID. It returns only business id/name/role/completion, null metrics, empty chart/activity arrays and acknowledged date filter; no bank/GST/private profile fields. Unknown queries including businessId are rejected. Missing current business returns null for onboarding routing. No new database models, migrations, cache or jobs.
+- Validated period query: today, yesterday, last7, last30, thisMonth (default), lastMonth, financialYear, custom. Custom dates must be real ordered YYYY-MM-DD dates; dates with non-custom periods are rejected. Asia/Kolkata is explicit. Filtering acknowledges empty data only; no financial aggregation.
+- Final root lint/typecheck/build passed; API unit 56 passed; HTTP/e2e 28 passed (13 new dashboard cases), one real PostgreSQL test skipped. Prisma schema validate/generate passed, schema unchanged; migration application NOT RUN.
+- Lightweight Node/CDP browser test at apps/web/scripts/dashboard-smoke.mjs requires installed Chrome/Edge and a prior build; no browser testing framework dependency. Uses isolated test-only API responses, not a production bypass. Browser checks passed at 1440, 1024, 768, 375px with long business name, no content overflow, groups/disabled actions, drawer focus containment/Escape/restoration, notifications, custom range, loading, error/retry, login/onboarding redirects and logout. Screenshots were inspected; live auth/persistence still unverified. Browser sandbox renderer timeout required an approved run outside the sandbox. Smoke frontend/browser stopped afterward.
+- Docker/psql/redis-server still unavailable on PATH; no local PostgreSQL/Redis listeners. Real database transactions and Redis/BullMQ runtime remain unverified. Audits remain 4 high production and 9 full (2 low, 1 moderate, 6 high). The icon-only workspace install reported zero for its scope; this is NOT a clean root audit. No forced dependency fixes or unrelated upgrades. Existing lifecycle-script and Vitest plugin warnings remain.
+- Phase 4 requires explicit new authorization. The sections below record historical Phase 2/1 status and are superseded by this section where applicable.
+
+## Historical Phase 2 implementation: 2026-09-08
 
 - Continued the existing Phase 2 working tree; no authentication rewrite, reset, commit, push or Phase 3 work. The Phase 1 section below is historical; this section supersedes its auth/schema/test status.
 - Argon2id via @node-rs/argon2: memoryCost 19456 KiB, timeCost 2, parallelism 1. jose signs HS256 access JWTs with issuer/audience checks and 15-minute expiry. Missing local JWT_SECRET generates a per-process key. JWT_REFRESH_SECRET is unused but retained in existing production configuration validation.
@@ -65,7 +78,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 
 1. Foundation and architecture (implemented, limitations above; stop here).
 2. Authentication + Business onboarding (implemented; runtime limitations above; stop here).
-3. Dashboard + Navigation.
+3. Dashboard + Navigation (implemented; runtime limitations above; stop here).
 4. Customers + Suppliers.
 5. Products + Inventory.
 6. GST Billing + Invoice Generation.
@@ -83,7 +96,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 18. Security + Performance + Testing.
 19. Docker + Production Deployment.
 
-Stop after the explicitly requested task/phase. Phase 3 requires new user authorization.
+Stop after the explicitly requested task/phase. Phase 4 requires new user authorization.
 
 ## Implementation rules
 

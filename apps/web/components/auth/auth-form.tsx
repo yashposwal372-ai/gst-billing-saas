@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -20,6 +20,10 @@ const copy: Record<Mode, { title: string; description: string; button: string }>
 };
 export function AuthForm({ mode }: { mode: Mode }) {
   const auth = useAuth(); const router = useRouter();
+  useEffect(() => {
+    if ((mode === "login" || mode === "signup") && auth.status === "authenticated")
+      router.replace(auth.user?.currentBusinessId ? "/dashboard" : "/onboarding");
+  }, [mode, auth.status, auth.user?.currentBusinessId, router]);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState(""); const [message, setMessage] = useState("");
@@ -36,7 +40,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       if (mode === "login" || mode === "signup") {
         const result = await api<AuthResult>("/auth/" + mode, { method: "POST", body: JSON.stringify(body) }, false);
         auth.setUser(result.user);
-        router.replace(result.user.currentBusinessId ? "/welcome" : "/onboarding");
+        router.replace(result.user.currentBusinessId ? "/dashboard" : "/onboarding");
       } else {
         const result = await api<{ message: string }>("/auth/" + mode, { method: "POST", body: JSON.stringify(body) }, false);
         setMessage(result.message);

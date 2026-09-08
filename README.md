@@ -1,6 +1,6 @@
 # GST Billing & Business Management SaaS
 
-Phase 2 authentication and business onboarding are implemented. Dashboard and billing features remain future work. Live PostgreSQL/Redis verification is outstanding.
+Phase 3 adds the authenticated application shell and dashboard foundation to the existing authentication and business onboarding. Financial and operational modules remain future work. Live PostgreSQL/Redis verification is outstanding.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ Tailwind 4 uses @tailwindcss/postcss and CSS imports; existing App Router/CSS mo
 
 ## Phase 2 usage and validation (2026-09-08)
 
-Open `/signup` or `/login`, then complete `/onboarding`: business/address details, GST information, and invoice defaults with optional bank/UPI details. `/welcome` is a minimal completion page with profile editing and logout. `/forgot-password`, `/reset-password`, and `/verify-email` provide recovery/verification forms. GST/PAN/bank checks are format checks only; logo uploads and email delivery are not connected.
+Open `/signup` or `/login`, then complete `/onboarding`: business/address details, GST information, and invoice defaults with optional bank/UPI details. Completed onboarding now leads to `/dashboard`; `/welcome` remains available for compatibility. `/forgot-password`, `/reset-password`, and `/verify-email` provide recovery/verification forms. GST/PAN/bank checks are format checks only; logo uploads and email delivery are not connected.
 
 All routes use `/api/v1`. Auth exposes POST `/auth/signup`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/verify-email`, `/auth/request-verification`, and GET `/auth/me`. Business routes are POST `/businesses`, GET `/businesses/current`, and PATCH `/businesses/current` (complete profile DTO). Business creation and OWNER membership are transactional; reads/updates require the authenticated user's OWNER membership.
 
@@ -88,6 +88,16 @@ Install, lint, typecheck, build, Prisma format/validate/generate passed. Fresh o
 
 Production-server smoke checks returned HTTP 200 for `/`, all seven Phase 2 frontend routes, the API root and health. Servers were stopped. Responsive styles, labels, error states and keyboard controls were reviewed in source; interactive browser flows, live persistence, transaction concurrency and the local utility were not runtime verified.
 
+## Phase 3 dashboard and navigation (2026-09-08)
+
+`/dashboard` uses the reusable `(app)` layout with a desktop sidebar, tablet/mobile drawer, current-business context, account/logout menu, search placeholder and notification placeholder. Future navigation items and quick actions are disabled and marked Soon. KPI cards, five chart areas and recent activity use explicit unavailable/empty states; no financial data is invented. Lucide supplies icons; no chart library or Redis cache was added.
+
+`GET /api/v1/dashboard/summary` requires the existing cookie session and OWNER membership for the authenticated user's current business. Unknown query fields (including businessId) are rejected. The response selects only business ID/name/completion/role, null metrics, empty chart/activity arrays and the acknowledged filter. A missing current business returns business: null so the UI can route to onboarding. `period` supports today, yesterday, last7, last30, thisMonth (default), lastMonth, financialYear and custom. Custom requires ordered real dates in `start` and `end` as YYYY-MM-DD. Filters acknowledge the empty dataset in Asia/Kolkata; financial aggregation is not implemented. No schema change or migration was needed.
+
+Validation: lint, typecheck, production build and Prisma validation/generation passed. API unit tests: 56 passed. HTTP/e2e: 28 passed, including 13 new dashboard cases; one live PostgreSQL test remains skipped. Existing cookie, refresh, CSRF and session behavior is preserved.
+
+For optional browser smoke checks, first build the app and free port 3000, then run `node apps/web/scripts/dashboard-smoke.mjs`. It uses Node 24 and installed Chrome on Windows; pass another Chrome/Edge executable as the first argument if needed. It starts/stops its own frontend/browser and uses isolated test-only API interception, with no database or real authentication. Checks cover 1440/1024/768/375px overflow, long business names, navigation groups, drawer Tab wrapping/Escape/focus restoration, notifications, date filtering, loading, errors/retry, auth/onboarding routing and logout. Screenshots and browser profile are written to a unique OS temporary directory. These checks passed; they do not establish live persistence. Sandbox renderer restrictions required an approved browser run outside the sandbox here.
+
 ## Infrastructure and dependency limitations
 
 Phase 1 previously verified root dev serving on ports 3000 and 4000; watch restart was not verified. Phase 2 runtime checks used compiled servers.
@@ -98,4 +108,4 @@ npm audit reports 9 packages: 2 low, 1 moderate, 6 high. Production-only audit r
 
 npm also warns of unapproved dependency lifecycle scripts for Prisma, its engines, and optional msgpackr-extract. Generation/build/tests work in this environment; no blanket script approval was added. Vitest reports the existing vite-tsconfig-paths native-support warning.
 
-Phase 3 (Dashboard + Navigation) has not started and requires separate authorization.
+Phase 3 implementation is complete with the runtime limitations above. Phase 4 (Customers + Suppliers) has not started and requires separate authorization.

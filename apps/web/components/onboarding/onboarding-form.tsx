@@ -82,14 +82,14 @@ export function OnboardingForm() {
     setErrors({}); setBusy(true);
     try {
       await api(editing ? "/businesses/current" : "/businesses", { method: editing ? "PATCH" : "POST", body: JSON.stringify(parsed.data) });
-      await auth.refreshUser(); router.replace("/welcome");
+      await auth.refreshUser(); router.replace("/dashboard");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to save your business"); }
     finally { setBusy(false); }
   }
   return <main className="min-h-dvh bg-[#f4f6f9] px-5 py-8 text-slate-900 sm:px-10">
     <header className="mx-auto flex max-w-5xl items-center justify-between gap-4 border-b border-slate-200 pb-6">
       <span className="font-semibold tracking-tight">GST Billing <span className="font-normal text-slate-500">/ Business setup</span></span>
-      <Link href={editing ? "/welcome" : "/login"} className="text-sm text-teal-800">{editing ? "Back to workspace" : "Back to sign in"}</Link>
+      <Link href={editing ? "/dashboard" : "/login"} className="text-sm text-teal-800">{editing ? "Back to workspace" : "Back to sign in"}</Link>
     </header>
     <div className="mx-auto mt-10 max-w-5xl lg:grid lg:grid-cols-[240px_1fr] lg:gap-14">
       <aside>

@@ -9,6 +9,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BusinessesModule } from './businesses/businesses.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { BusinessesModule } from './businesses/businesses.module.js';
     HealthModule,
     AuthModule,
     BusinessesModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
