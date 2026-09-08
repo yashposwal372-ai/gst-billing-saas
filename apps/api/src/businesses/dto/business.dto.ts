@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 import { BusinessType, GstMode } from '../../generated/prisma/enums.js';
+import { GSTIN_PATTERN, PAN_PATTERN } from '../../common/india-formats.js';
 
 const trim = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
 const optional = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() || undefined : value;
@@ -13,10 +14,10 @@ export class BusinessDto {
   @IsEnum(BusinessType) businessType!: BusinessType;
   @IsBoolean() gstRegistered!: boolean;
   @Transform(upper) @IsOptional()
-  @Matches(/^[0-9]{2}[A-Z]{3}[ABCFGHLJPT][A-Z][0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, { message: 'GSTIN format is invalid (format check only)' })
+  @Matches(GSTIN_PATTERN, { message: 'GSTIN format is invalid (format check only)' })
   gstin?: string;
   @Transform(upper) @IsOptional()
-  @Matches(/^[A-Z]{3}[ABCFGHLJPT][A-Z][0-9]{4}[A-Z]$/, { message: 'PAN format is invalid' })
+  @Matches(PAN_PATTERN, { message: 'PAN format is invalid' })
   pan?: string;
   @Matches(/^\+?[1-9]\d{9,14}$/) mobile!: string;
   @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim().toLowerCase() : value)

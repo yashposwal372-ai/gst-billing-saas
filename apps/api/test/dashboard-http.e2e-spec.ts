@@ -11,7 +11,7 @@ describe('dashboard HTTP (database double, real auth guard)', () => {
   let cookie: string;
   const user = { id: 'user-a', currentBusinessId: 'business-a', status: 'ACTIVE', authVersion: 0 };
   const session = { id: 'session-a', userId: user.id, user, expiresAt: new Date(Date.now() + 600000), revokedAt: null, authVersion: 0 };
-  const membership = { role: 'OWNER', business: { id: 'business-a', name: 'Authorized business', onboardingCompletedAt: new Date() } };
+  const membership = { role: 'OWNER', business: { id: 'business-a', name: 'Authorized business', onboardingCompletedAt: new Date(), _count: { customers: 3, suppliers: 2 } } };
   const db = { authSession: { findUnique: vi.fn() }, businessMember: { findUnique: vi.fn() } };
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -31,7 +31,11 @@ describe('dashboard HTTP (database double, real auth guard)', () => {
     const result = await get().expect(200);
     expect(result.body.business).toEqual({ id: 'business-a', name: 'Authorized business', role: 'OWNER', onboardingCompleted: true });
     expect(result.body.dataStatus).toBe('not_available');
-    expect(Object.values(result.body.metrics).every((value) => value === null)).toBe(true);
+    const { customers, suppliers, ...future } = result.body.metrics;
+    expect(customers).toBe(3);
+    expect(suppliers).toBe(2);
+    expect(Object.values(future).every((value) => value === null)).toBe(true);
+    expect(db.businessMember.findUnique.mock.calls[0]![0].select.business.select._count.select).toEqual({customers:{where:{isActive:true}},suppliers:{where:{isActive:true}}});
     expect(result.body.recentActivity).toEqual([]);
     expect(Object.values(result.body.charts).every((value) => Array.isArray(value) && value.length === 0)).toBe(true);
     expect(result.headers['cache-control']).toBe('no-store');

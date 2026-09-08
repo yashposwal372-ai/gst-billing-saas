@@ -8,9 +8,12 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createPartyFixtures, runPartiesSmoke } from './parties-smoke.mjs';
 
 const webRoot = fileURLToPath(new URL('../', import.meta.url));
-const browserPath = process.argv[2] ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const browserPath = process.argv.slice(2).find(arg => arg !== '--parties') ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const partyMode = process.argv.includes('--parties');
+const partyFixtures = createPartyFixtures();
 const artifacts = await mkdtemp(join(tmpdir(), 'gst-dashboard-smoke-'));
 const origin = 'http://localhost:3000';
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -60,7 +63,9 @@ try {
     if (message.method === 'Fetch.requestPaused') {
       const { requestId, request } = message.params; const url = new URL(request.url);
       let code = 200; let body = {};
-      if (url.pathname.endsWith('/auth/me')) { code = signedIn ? 200 : 401; body = { user: { ...testUser, currentBusinessId: noBusiness ? null : testUser.currentBusinessId } }; }
+      const partyResponse = await partyFixtures.respond(url, request);
+      if (partyResponse) { code = partyResponse.code; body = partyResponse.body; }
+      else if (url.pathname.endsWith('/auth/me')) { code = signedIn ? 200 : 401; body = { user: { ...testUser, currentBusinessId: noBusiness ? null : testUser.currentBusinessId } }; }
       else if (url.pathname.endsWith('/auth/logout')) { signedIn = false; logoutCalled = true; body = { status: 'ok' }; }
       else if (url.pathname.endsWith('/auth/refresh')) { code = signedIn ? 200 : 401; }
       else if (url.pathname.endsWith('/dashboard/summary')) {
@@ -70,12 +75,12 @@ try {
         body = summaryError ? { message: 'Internal test error must not be displayed' } : {
           business: { id: 'ui-test-business', name: 'Shah & Sons Trading Company — A deliberately long business name for responsive layout verification', role: 'OWNER', onboardingCompleted: true },
           dataStatus: 'not_available', filter: { period: url.searchParams.get('period') ?? 'thisMonth', start: url.searchParams.get('start'), end: url.searchParams.get('end'), timezone: 'Asia/Kolkata' },
-          metrics: Object.fromEntries(metricKeys.map((key) => [key, null])), recentActivity: [], charts: { sales: [], gst: [], invoiceStatus: [], paymentMethods: [], topProducts: [] },
+          metrics: Object.fromEntries(metricKeys.map((key) => [key, key === 'customers' || key === 'suppliers' ? 1 : null])), recentActivity: [], charts: { sales: [], gst: [], invoiceStatus: [], paymentMethods: [], topProducts: [] },
         };
       } else if (url.pathname.endsWith('/businesses/current')) body = { business: null };
       else { code = 404; }
       try { await send('Fetch.fulfillRequest', { requestId, responseCode: request.method === 'OPTIONS' ? 204 : code,
-        responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: origin }, { name: 'Access-Control-Allow-Credentials', value: 'true' }, { name: 'Access-Control-Allow-Headers', value: 'Content-Type, X-CSRF-Protection' }, { name: 'Access-Control-Allow-Methods', value: 'GET, POST, PATCH, OPTIONS' }],
+        responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: origin }, { name: 'Access-Control-Allow-Credentials', value: 'true' }, { name: 'Access-Control-Allow-Headers', value: 'Content-Type, X-CSRF-Protection' }, { name: 'Access-Control-Allow-Methods', value: 'GET, POST, PATCH, DELETE, OPTIONS' }],
         body: request.method === 'OPTIONS' ? '' : Buffer.from(JSON.stringify(body)).toString('base64'),
       }); } catch { /* Browser may be closing */ }
     }
@@ -96,13 +101,15 @@ try {
     await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code, windowsVirtualKeyCode });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode });
   };
+  if (partyMode) await runPartiesSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:partyFixtures});
+  else {
   for (const width of [1440, 1024, 768, 375]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
     await navigate('/dashboard'); await ready();
     const sizes = await evaluate(`({ width: innerWidth, documentWidth: document.documentElement.scrollWidth, mainWidth: document.querySelector('main').scrollWidth, mainClient: document.querySelector('main').clientWidth })`);
     assert.ok(sizes.documentWidth <= sizes.width, 'Document overflow at ' + width);
     assert.ok(sizes.mainWidth <= sizes.mainClient, 'Main content overflow at ' + width);
-    assert.equal(await evaluate('document.querySelectorAll("main button:disabled").length'), 4);
+    assert.equal(await evaluate('document.querySelectorAll("main button:disabled").length'), 3);
     assert.ok(await evaluate('document.querySelector("[aria-current=page]") !== null'));
     if (width < 1200) {
       await evaluate(`document.querySelector('[aria-label="Open navigation"]').focus(); document.querySelector('[aria-label="Open navigation"]').click()`);
@@ -149,8 +156,9 @@ try {
   await evaluate(`document.querySelector('summary[aria-label="Open account menu"]').click(); Array.from(document.querySelectorAll('button')).find(button=>button.textContent==='Sign out').click()`);
   await until(() => evaluate('location.pathname === "/login"'), 'logout redirect'); assert.equal(logoutCalled, true);
   await navigate('/dashboard'); await until(() => evaluate('location.pathname === "/login"'), 'unauthenticated redirect');
+  }
   assert.deepEqual(pageErrors, []);
-  console.log('PASS custom dates, error/retry, skeleton, auth redirects, account Escape and logout');
+  console.log(partyMode ? 'PASS party workflows using test-only API fixtures' : 'PASS custom dates, error/retry, skeleton, auth redirects, account Escape and logout');
   console.log('Test-only API fixtures used. Screenshots:', artifacts);
   await send('Browser.close', {}, null).catch(() => {});
 } finally {

@@ -15,7 +15,7 @@ export const dashboardSchema = z.object({
   filter: z.object({ period: z.string(), start: z.string().nullable(), end: z.string().nullable(), timezone: z.literal("Asia/Kolkata") }),
   metrics: z.object({ todaySales: unavailable, monthlySales: unavailable, totalSales: unavailable,
     totalPurchases: unavailable, totalExpenses: unavailable, totalGst: unavailable, receivables: unavailable,
-    customers: unavailable, suppliers: unavailable, products: unavailable, lowStock: unavailable, overdueInvoices: unavailable }),
+    customers: z.number().int().nonnegative().nullable(), suppliers: z.number().int().nonnegative().nullable(), products: unavailable, lowStock: unavailable, overdueInvoices: unavailable }),
   recentActivity: empty,
   charts: z.object({ sales: empty, gst: empty, invoiceStatus: empty, paymentMethods: empty, topProducts: empty }),
 });

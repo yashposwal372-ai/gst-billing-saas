@@ -12,7 +12,8 @@ const metrics: { label: string; icon: IconName; note: string }[] = [
   { label: "Monthly sales", icon: "calendar", note: "Your month at a glance" },
   { label: "GST collected", icon: "receipt", note: "Tax insights coming soon" },
   { label: "Outstanding receivables", icon: "wallet", note: "Payments insights coming soon" },
-  { label: "Total customers", icon: "people", note: "Build your customer base" },
+  { label: "Active customers", icon: "people", note: "Current active customer records" },
+  { label: "Active suppliers", icon: "people", note: "Current active supplier records" },
   { label: "Total products", icon: "box", note: "Your catalogue starts here" },
   { label: "Low stock", icon: "bag", note: "Stock alerts coming soon" },
   { label: "Overdue invoices", icon: "clock", note: "Invoice tracking coming soon" },
@@ -65,11 +66,11 @@ export function Dashboard() {
   return <>
     <div className={styles.pageHeading}><div><p className={styles.eyebrow}>YOUR BUSINESS AT A GLANCE</p><h1>Welcome back, {user.firstName}.</h1><p>Here’s the overview for <strong>{summary.business?.name}</strong>.</p></div><DateFilter /></div>
     <section className={styles.setupBanner}><span className={styles.bannerIcon}><Icon name="check" /></span><div><strong>A strong start for your business</strong><p>Your profile is ready. Sales, inventory and financial insights will arrive with upcoming modules.</p></div><Link href="/onboarding">Review profile<Icon name="arrow" /></Link></section>
-    <section className={styles.quickActions} aria-label="Quick actions"><span>Quick actions</span>{quickActions.map((action) => <button disabled key={action.label}><Icon name={action.icon} /><span>{action.label}</span><small>Soon</small></button>)}</section>
+    <section className={styles.quickActions} aria-label="Quick actions"><span>Quick actions</span>{quickActions.map((action) => action.label === "Add customer" ? <Link key={action.label} href="/customers/new"><Icon name={action.icon} /><span>{action.label}</span></Link> : <button disabled key={action.label}><Icon name={action.icon} /><span>{action.label}</span><small>Soon</small></button>)}</section>
     {loading ? <DashboardSkeleton /> : <div aria-live="polite" aria-atomic="false">
       <div className={styles.sectionLabel}><h2>Business overview</h2><span>{selectedPeriod} · INR · India time</span></div>
       <div className={styles.kpiGrid}>{metrics.map((metric) => <section key={metric.label} className={styles.kpiCard}>
-        <div><h3>{metric.label}</h3><Icon name={metric.icon} /></div><p className={styles.metricValue} aria-label="Not available">—</p><p className={styles.metricNote}>{metric.note}</p>
+        <div><h3>{metric.label}</h3><Icon name={metric.icon} /></div><p className={styles.metricValue}>{metric.label === "Active customers" ? summary.metrics.customers ?? "—" : metric.label === "Active suppliers" ? summary.metrics.suppliers ?? "—" : <span aria-label="Not available">—</span>}</p><p className={styles.metricNote}>{metric.note}</p>
       </section>)}</div>
       <div className={styles.chartGrid}>
         <section className={`${styles.panel} ${styles.salesPanel}`}>
@@ -79,9 +80,10 @@ export function Dashboard() {
           <div className={styles.panelFoot}>No financial data is available for this period.</div>
         </section>
         <section className={`${styles.panel} ${styles.gettingStarted}`}><div className={styles.panelHeader}><div><h2>Make yourself at home</h2><p>A few steps toward your first sale</p></div><Icon name="spark" /></div>
-          <div className={styles.progressLabel}><span>Workspace setup</span><strong>1 of 4</strong></div><progress value={1} max={4} aria-label="Workspace setup: 1 of 4 steps complete" />
+          <div className={styles.progressLabel}><span>Workspace setup</span><strong>{summary.metrics.customers ? 2 : 1} of 4</strong></div><progress value={summary.metrics.customers ? 2 : 1} max={4} aria-label="Workspace setup progress" />
           <ol className={styles.checklist}><li><span className={styles.complete}><Icon name="check" /></span><div><strong>Set up your business</strong><small>Profile complete</small></div><Link href="/onboarding" aria-label="Review business profile"><Icon name="arrow" /></Link></li>
-            {["Add your first customer", "Add your first product", "Create your first invoice"].map((label, index) => <li key={label}><span>{index + 2}</span><div><strong>{label}</strong><small>Coming soon</small></div></li>)}</ol>
+            <li><span>{summary.metrics.customers ? <Icon name="check" /> : 2}</span><div><strong>Add your first customer</strong><small>{summary.metrics.customers ? "Customer added" : "Ready to begin"}</small></div><Link href="/customers/new" aria-label="Add customer"><Icon name="arrow" /></Link></li>
+            {["Add your first product", "Create your first invoice"].map((label, index) => <li key={label}><span>{index + 3}</span><div><strong>{label}</strong><small>Coming soon</small></div></li>)}</ol>
           <p className={styles.checklistNote}>Your next chapter is on its way. We’ll make each step simple.</p>
         </section>
       </div>

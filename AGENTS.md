@@ -2,7 +2,7 @@
 
 ## Locked product and architecture
 
-Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding and the authenticated dashboard/navigation foundation are implemented through Phase 3. Eventual scope includes GST billing, business documents, parties, inventory, payments, accounting, reports, portals, staff, AI, subscriptions, and administration. These later product features are not implemented.
+Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation and customer/supplier management are implemented through Phase 4. Inventory, billing, payments, accounting, reports, portals, staff, AI, subscriptions and administration remain future work.
 
 - Frontend: Next.js + React + TypeScript + Tailwind CSS in apps/web, with Zod validation.
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
@@ -11,7 +11,26 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
 
-## Verified Phase 3 implementation: 2026-09-08
+## Verified Phase 4 implementation: 2026-09-08
+
+- Started from approved clean Phase 3 checkpoint c1eaa397ba2555a343f5d104d3f6e5e0df01cfeb. Phase 4 was reviewed and approved for checkpoint creation; no push, reset, unrelated cleanup or Phase 5 implementation.
+- Customer and Supplier each belong to one Business, with business-scoped unique code and optional GSTIN. Both store contact/tax/address/terms/notes/status and decimal opening balance/direction. Customer adds type, shipping address and credit limit; Supplier adds optional bank fields. Customer addressLine1/addressLine2/city/state/stateCode/pincode represent the billing address.
+- Business nextCustomerNumber/nextSupplierNumber counters are atomically incremented inside each creation transaction, producing CUS-000001 / SUP-000001 onward. Counters and inserts commit/roll back together; unique indexes provide a final constraint. Real concurrent allocation/rollback remains unverified without PostgreSQL.
+- NestJS CustomersModule and SuppliersModule expose POST/GET collection and GET/PATCH/DELETE :id. Existing AuthGuard and BrowserWriteGuard protect requests; writes retain exact Origin and CSRF header checks. CORS now permits DELETE for deactivation. Every party query is scoped to trusted current business and OWNER membership. IDs are UUID-validated; client tenant/code fields and unknown DTO/list-query properties are rejected.
+- PATCH accepts partial profiles; omission preserves values, empty optional strings clear them, and null required fields are rejected. Cross-field checks run against merged data. DELETE deactivates without deleting; PATCH isActive:true reactivates. Business deletion is restricted while party records exist. No ledger/audit/financial transaction models were introduced.
+- List queries support page (1..100000), pageSize (default 20, max 100), submitted search, status (active default/all/inactive), gstRegistered (all/true/false), state, sortBy (displayName/code/createdAt/updatedAt), sortOrder (asc/desc). Stable ID tie-breaks, database pagination/count and compact selects avoid N+1 reads and bank/notes exposure. List/count use RepeatableRead; partial updates use Serializable and surface retryable conflicts through the existing sanitized error handler.
+- Opening balance and customer credit limit use Decimal(15,2), accept nonnegative decimal strings with at most two fractional digits, and serialize as fixed two-place strings. Opening balance direction is RECEIVABLE/PAYABLE (customer default receivable, supplier default payable). All invoice/payment/purchase totals and counts remain null; ledger/activity arrays remain empty. Opening balances are independent entered amounts, not computed dues or transactions.
+- Backend GSTIN/PAN patterns are centralized and reused by onboarding and parties; frontend reuses existing business Zod fields. Party state/code and GSTIN/PAN consistency, conditional shipping and complete optional bank fields are checked. These are format/consistency checks, not government/bank verification.
+- Authenticated /customers and /suppliers each have list, /new, /:id and /:id/edit pages in the existing shell. Reusable forms, URL query filters, desktop tables/mobile rows, loading/error/retry, inline validation, save feedback, native status confirmation dialogs and masked bank display are implemented. Full account number appears only in authorized editing. Unsaved-change protection covers reload/close and Cancel; other in-app navigation is not intercepted.
+- Customers/Suppliers navigation and Add customer dashboard action are enabled; other future actions remain disabled. Header/active navigation follow the route. Dashboard returns current active customer/supplier counts via authorized business relation counts, independent of the date filter; financial dataStatus remains not_available. Setup checklist reflects active customer availability.
+- Migration 20260908123000_phase4_customers_suppliers was generated offline from the Phase 3 schema and inspected: two tables, enums, scoped indexes, foreign keys and two business counters. Prisma format/validate/generate passed. Migration application NOT RUN.
+- Root lint/typecheck/build passed. Unit tests: 88 passed. HTTP/e2e: 104 passed; two real PostgreSQL tests skipped. Added opt-in dedicated *_test database suite covering concurrent party codes, decimal persistence, scoped GSTIN uniqueness, duplicate rollback and isolation; not executed here.
+- Final continuation review reconfirmed those results and exact equality of the migration with a fresh offline Phase 3-to-4 schema diff. Frontend root/customer/supplier pages and API root/health returned 200; unauthenticated customer/supplier APIs returned 401. Smoke processes stopped. A Windows EPERM build-output failure was resolved by preserving generated .next output under ignored node_modules/.cache/gst-phase4-next-e432c0e59a1545ceab0bc2d4e74623a6 and rebuilding; no source cleanup was required.
+- Existing Node/CDP harness supports --parties. Test-only fixtures cover both directories at 1440/1024/768/375px (list/new/detail/edit/dialog), long names, overflow, validation, create/edit/conflict, deactivate/reactivate, search/pagination, loading/empty/error/retry and bank masking. Browser checks passed after approved execution outside the sandbox; screenshots inspected. Native dialog focus restoration is explicit. No new browser framework or dependency.
+- Docker/psql/redis-server remain unavailable on PATH; PostgreSQL and Redis listeners absent. Live migration, auth/persistence/concurrency and Redis/BullMQ runtime remain unverified. Full audit: 9 findings (2 low, 1 moderate, 6 high); production: 4 high. No forced fixes/upgrades. Existing Vitest plugin warning remains.
+- Phase 5 requires explicit new authorization. Historical sections below are superseded by this section where applicable.
+
+## Historical Phase 3 implementation: 2026-09-08
 
 - Started from approved clean Phase 2 checkpoint cc2b646383ab24b42f05ba9c56c758d89e4079be. No Phase 4 implementation, commits, pushes, resets or cleanup of unrelated files in Phase 3.
 - Added reusable apps/web/app/(app)/layout.tsx and /dashboard. Existing auth/onboarding routes were not moved. Login/signup with a current business and successful onboarding now lead to /dashboard; /welcome remains a compatibility page. Phase 2 auth provider and secure logout are reused.
@@ -79,7 +98,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 1. Foundation and architecture (implemented, limitations above; stop here).
 2. Authentication + Business onboarding (implemented; runtime limitations above; stop here).
 3. Dashboard + Navigation (implemented; runtime limitations above; stop here).
-4. Customers + Suppliers.
+4. Customers + Suppliers (implemented; runtime limitations above; stop here).
 5. Products + Inventory.
 6. GST Billing + Invoice Generation.
 7. Sales + Purchases.
@@ -96,7 +115,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 18. Security + Performance + Testing.
 19. Docker + Production Deployment.
 
-Stop after the explicitly requested task/phase. Phase 4 requires new user authorization.
+Stop after the explicitly requested task/phase. Phase 5 requires new user authorization.
 
 ## Implementation rules
 

@@ -4,6 +4,98 @@ generator client {
   moduleFormat = "esm"
 }
 
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum BalanceDirection {
+  RECEIVABLE
+  PAYABLE
+}
+
+model Customer {
+  id                    String           @id @default(uuid()) @db.Uuid
+  businessId            String           @db.Uuid
+  business              Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  displayName           String           @db.VarChar(160)
+  businessName          String?          @db.VarChar(160)
+  contactPerson         String?          @db.VarChar(160)
+  gstRegistered         Boolean          @default(false)
+  gstin                 String?          @db.VarChar(15)
+  pan                   String?          @db.VarChar(10)
+  phone                 String           @db.VarChar(16)
+  whatsappNumber        String?          @db.VarChar(16)
+  email                 String?          @db.VarChar(254)
+  addressLine1          String           @db.VarChar(200)
+  addressLine2          String?          @db.VarChar(200)
+  city                  String           @db.VarChar(80)
+  state                 String           @db.VarChar(80)
+  stateCode             String           @db.Char(2)
+  pincode               String           @db.Char(6)
+  openingBalance        Decimal          @default(0) @db.Decimal(15, 2)
+  openingBalanceType    BalanceDirection
+  paymentTermsDays      Int              @default(0)
+  notes                 String?          @db.VarChar(2000)
+  isActive              Boolean          @default(true)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  customerCode          String           @db.VarChar(20)
+  customerType          CustomerType     @default(INDIVIDUAL)
+  shippingSameAsBilling Boolean          @default(true)
+  shippingAddressLine1  String?          @db.VarChar(200)
+  shippingAddressLine2  String?          @db.VarChar(200)
+  shippingCity          String?          @db.VarChar(80)
+  shippingState         String?          @db.VarChar(80)
+  shippingStateCode     String?          @db.Char(2)
+  shippingPincode       String?          @db.Char(6)
+  creditLimit           Decimal?         @db.Decimal(15, 2)
+
+  @@unique([businessId, customerCode])
+  @@unique([businessId, gstin])
+  @@index([businessId, isActive, createdAt])
+  @@index([businessId, displayName])
+}
+
+model Supplier {
+  id                 String           @id @default(uuid()) @db.Uuid
+  businessId         String           @db.Uuid
+  business           Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  displayName        String           @db.VarChar(160)
+  businessName       String?          @db.VarChar(160)
+  contactPerson      String?          @db.VarChar(160)
+  gstRegistered      Boolean          @default(false)
+  gstin              String?          @db.VarChar(15)
+  pan                String?          @db.VarChar(10)
+  phone              String           @db.VarChar(16)
+  whatsappNumber     String?          @db.VarChar(16)
+  email              String?          @db.VarChar(254)
+  addressLine1       String           @db.VarChar(200)
+  addressLine2       String?          @db.VarChar(200)
+  city               String           @db.VarChar(80)
+  state              String           @db.VarChar(80)
+  stateCode          String           @db.Char(2)
+  pincode            String           @db.Char(6)
+  openingBalance     Decimal          @default(0) @db.Decimal(15, 2)
+  openingBalanceType BalanceDirection
+  paymentTermsDays   Int              @default(0)
+  notes              String?          @db.VarChar(2000)
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  supplierCode       String           @db.VarChar(20)
+  bankName           String?          @db.VarChar(120)
+  accountHolderName  String?          @db.VarChar(160)
+  accountNumber      String?          @db.VarChar(34)
+  ifsc               String?          @db.Char(11)
+  upiId              String?          @db.VarChar(100)
+
+  @@unique([businessId, supplierCode])
+  @@unique([businessId, gstin])
+  @@index([businessId, isActive, createdAt])
+  @@index([businessId, displayName])
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -108,6 +200,10 @@ model EmailVerificationToken {
 // Only NestJS accesses tenant data. Future financial operations require
 // transactions and business-scoped queries/indexes, designed in their phases.
 model Business {
+  customers             Customer[]
+  suppliers             Supplier[]
+  nextCustomerNumber    Int              @default(0)
+  nextSupplierNumber    Int              @default(0)
   id                    String           @id @default(uuid()) @db.Uuid
   name                  String           @db.VarChar(160)
   tradeName             String?          @db.VarChar(160)

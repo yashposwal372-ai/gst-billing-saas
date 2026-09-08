@@ -1,6 +1,6 @@
 # GST Billing & Business Management SaaS
 
-Phase 3 adds the authenticated application shell and dashboard foundation to the existing authentication and business onboarding. Financial and operational modules remain future work. Live PostgreSQL/Redis verification is outstanding.
+Phase 4 adds customer and supplier management to the existing authentication, onboarding and application shell. Inventory and financial modules remain future work. Live PostgreSQL/Redis verification is outstanding.
 
 ## Architecture
 
@@ -98,6 +98,24 @@ Validation: lint, typecheck, production build and Prisma validation/generation p
 
 For optional browser smoke checks, first build the app and free port 3000, then run `node apps/web/scripts/dashboard-smoke.mjs`. It uses Node 24 and installed Chrome on Windows; pass another Chrome/Edge executable as the first argument if needed. It starts/stops its own frontend/browser and uses isolated test-only API interception, with no database or real authentication. Checks cover 1440/1024/768/375px overflow, long business names, navigation groups, drawer Tab wrapping/Escape/focus restoration, notifications, date filtering, loading, errors/retry, auth/onboarding routing and logout. Screenshots and browser profile are written to a unique OS temporary directory. These checks passed; they do not establish live persistence. Sandbox renderer restrictions required an approved browser run outside the sandbox here.
 
+## Phase 4 customers and suppliers (2026-09-08)
+
+Open `/customers` or `/suppliers`; each has `/new`, `/:id` and `/:id/edit` routes. Both use the existing authenticated shell. Lists support submitted search, URL filters, sorting and server pagination. Deactivation requires confirmation and retains the record; use the Inactive filter to find and reactivate it. Supplier account numbers are masked on detail pages and available in full only while editing. Cancel and browser reload/close warn about unsaved form changes; other in-app links are not intercepted.
+
+Under `/api/v1`, both `/customers` and `/suppliers` expose POST (create), GET (list), GET `/:id` (detail), PATCH `/:id` (partial update), and DELETE `/:id` (deactivate). PATCH `{"isActive":true}` reactivates. All use the current authorized OWNER business; do not submit businessId or party codes. Unknown body/list query fields are rejected. Optional strings can be cleared with an empty string; omitted PATCH fields are preserved.
+
+List parameters: `page` (default 1), `pageSize` (20, max 100), `search`, `status=active|inactive|all` (active default), `gstRegistered=all|true|false`, `state`, `sortBy=displayName|code|createdAt|updatedAt`, and `sortOrder=asc|desc`. Results include items/page/pageSize/total/totalPages. Lists omit bank details and notes. Details return profile, null future transaction totals/counts and empty ledger/activity arrays.
+
+Opening balances and customer credit limits use PostgreSQL Decimal(15,2): send nonnegative decimal **strings**, e.g. `"123.45"`, with at most two fractional digits. Responses have two decimal places. Opening balance has a RECEIVABLE or PAYABLE direction and is independent of live dues; no ledger entry is fabricated. Customer `addressLine1` through `pincode` are billing fields, with separate optional shipping fields. GST/PAN/state and bank checks are format/consistency checks only.
+
+Codes are business-scoped CUS-/SUP- sequences allocated by atomic business counters in the creation transaction. GSTIN uniqueness is scoped to each business and party type. No hard-delete API exists. Dashboard counts show current active customer/supplier records, independent of the date filter; financial metrics remain unavailable. Add customer is enabled.
+
+Migration `20260908123000_phase4_customers_suppliers` was generated offline against the Phase 3 schema and inspected; Prisma format/validate/generate passed. **Migration application and live database verification have not run.** Once PostgreSQL is available, apply migrations using the existing `npm run prisma:deploy --workspace api` workflow before using these features.
+
+Validation: lint, typecheck and build passed; 88 unit and 104 HTTP/e2e tests passed. Two live PostgreSQL suites are skipped without a migrated dedicated `*_test` database configured through `TEST_DATABASE_URL`. The new opt-in suite tests concurrent code allocation and rollback/isolation. No dependency was added.
+
+Run `node apps/web/scripts/dashboard-smoke.mjs --parties` after building, with port 3000 free, for fixture-based browser checks of lists/forms/details/dialogs at 1440/1024/768/375px plus validation/create/edit/status/filter/error flows. It uses the existing Chrome/Edge approach and stops its own processes. These checks passed but do not verify live persistence.
+
 ## Infrastructure and dependency limitations
 
 Phase 1 previously verified root dev serving on ports 3000 and 4000; watch restart was not verified. Phase 2 runtime checks used compiled servers.
@@ -108,4 +126,4 @@ npm audit reports 9 packages: 2 low, 1 moderate, 6 high. Production-only audit r
 
 npm also warns of unapproved dependency lifecycle scripts for Prisma, its engines, and optional msgpackr-extract. Generation/build/tests work in this environment; no blanket script approval was added. Vitest reports the existing vite-tsconfig-paths native-support warning.
 
-Phase 3 implementation is complete with the runtime limitations above. Phase 4 (Customers + Suppliers) has not started and requires separate authorization.
+Phase 4 implementation is complete with the runtime limitations above. Phase 5 (Products + Inventory) has not started and requires separate authorization.
