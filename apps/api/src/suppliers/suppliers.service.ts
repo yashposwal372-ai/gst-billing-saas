@@ -122,7 +122,7 @@ export class SuppliersService {
       where: { ...scope, id },
     });
     if (!row) throw new NotFoundException('Supplier not found');
-    const [purchaseTotals, purchaseCount] = await Promise.all([
+    const [purchaseTotals, purchaseCount, paid] = await Promise.all([
       this.db.businessDocument.aggregate({
         where: { ...scope, supplierId: id, documentType: 'PURCHASE_BILL', status: 'FINALIZED' },
         _sum: { grandTotal: true },
@@ -130,13 +130,17 @@ export class SuppliersService {
       this.db.businessDocument.count({
         where: { ...scope, supplierId: id, documentType: 'PURCHASE_BILL', status: 'FINALIZED' },
       }),
+      this.db.paymentAllocation.aggregate({
+        where: { businessId: user.currentBusinessId!, document: { supplierId: id, documentType: 'PURCHASE_BILL', status: 'FINALIZED' }, payment: { status: 'POSTED', type: 'SUPPLIER_PAYMENT' } },
+        _sum: { amount: true },
+      }),
     ]);
     return {
       profile: this.profile(row),
       summary: {
         totalPurchases: (purchaseTotals._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2),
-        amountPaid: null,
-        amountPayable: null,
+        amountPaid: (paid._sum.amount ?? new Prisma.Decimal(0)).toFixed(2),
+        amountPayable: (purchaseTotals._sum.grandTotal ?? new Prisma.Decimal(0)).minus(paid._sum.amount ?? new Prisma.Decimal(0)).toFixed(2),
         purchaseCount,
       },
       dataStatus: 'partial',

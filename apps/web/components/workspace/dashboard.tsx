@@ -11,7 +11,9 @@ const metrics: { label: string; icon: IconName; note: string }[] = [
   { label: "Today’s sales", icon: "chart", note: "Finalized invoice sales" },
   { label: "Monthly sales", icon: "calendar", note: "Finalized invoice sales" },
   { label: "GST collected", icon: "receipt", note: "Tax insights coming soon" },
-  { label: "Outstanding receivables", icon: "wallet", note: "Payments insights coming soon" },
+  { label: "Outstanding receivables", icon: "wallet", note: "Derived from posted receipt allocations" },
+  { label: "Outstanding payables", icon: "wallet", note: "Derived from posted supplier payments" },
+  { label: "Monthly expenses", icon: "receipt", note: "Posted expenses this month" },
   { label: "Active customers", icon: "people", note: "Current active customer records" },
   { label: "Active suppliers", icon: "people", note: "Current active supplier records" },
   { label: "Total products", icon: "box", note: "Current active physical products" },
@@ -65,12 +67,12 @@ export function Dashboard() {
   const selectedPeriod = periods.find(([key]) => key === summary.filter.period)?.[1] ?? "Selected period";
   return <>
     <div className={styles.pageHeading}><div><p className={styles.eyebrow}>YOUR BUSINESS AT A GLANCE</p><h1>Welcome back, {user.firstName}.</h1><p>Here’s the overview for <strong>{summary.business?.name}</strong>.</p></div><DateFilter /></div>
-    <section className={styles.setupBanner}><span className={styles.bannerIcon}><Icon name="check" /></span><div><strong>A strong start for your business</strong><p>Your profile is ready. Manage your catalogue, stock and sales invoices.</p></div><Link href="/onboarding">Review profile<Icon name="arrow" /></Link></section>
+    <section className={styles.setupBanner}><span className={styles.bannerIcon}><Icon name="check" /></span><div><strong>A strong start for your business</strong><p>Your profile is ready. Manage your catalogue, stock, invoices, payments and expenses.</p></div><Link href="/onboarding">Review profile<Icon name="arrow" /></Link></section>
     <section className={styles.quickActions} aria-label="Quick actions"><span>Quick actions</span>{quickActions.map((action) => action.label === "Create invoice" || action.label === "Add customer" || action.label === "Add product" || action.label === "Record purchase" ? <Link key={action.label} href={action.label === "Create invoice" ? "/invoices/new" : action.label === "Add customer" ? "/customers/new" : action.label === "Add product" ? "/products/new" : "/purchase-bills/new"}><Icon name={action.icon} /><span>{action.label}</span></Link> : <button disabled key={action.label}><Icon name={action.icon} /><span>{action.label}</span><small>Soon</small></button>)}</section>
     {loading ? <DashboardSkeleton /> : <div aria-live="polite" aria-atomic="false">
       <div className={styles.sectionLabel}><h2>Business overview</h2><span>{selectedPeriod} · INR · India time</span></div>
       <div className={styles.kpiGrid}>{metrics.map((metric) => <section key={metric.label} className={styles.kpiCard}>
-        <div><h3>{metric.label}</h3><Icon name={metric.icon} /></div><p className={styles.metricValue}>{metric.label === "Today’s sales" ? summary.metrics.todaySales ?? "—" : metric.label === "Monthly sales" ? summary.metrics.monthlySales ?? "—" : metric.label === "Active customers" ? summary.metrics.customers ?? "—" : metric.label === "Active suppliers" ? summary.metrics.suppliers ?? "—" : metric.label === "Total products" ? summary.metrics.products ?? "?" : metric.label === "Low stock" ? summary.metrics.lowStock ?? "?" : <span aria-label="Not available">—</span>}</p><p className={styles.metricNote}>{metric.note}</p>
+        <div><h3>{metric.label}</h3><Icon name={metric.icon} /></div><p className={styles.metricValue}>{metric.label === "Today’s sales" ? summary.metrics.todaySales ?? "—" : metric.label === "Monthly sales" ? summary.metrics.monthlySales ?? "—" : metric.label === "Outstanding receivables" ? summary.metrics.receivables ?? "?" : metric.label === "Outstanding payables" ? summary.metrics.payables ?? "?" : metric.label === "Monthly expenses" ? summary.metrics.totalExpenses ?? "?" : metric.label === "Active customers" ? summary.metrics.customers ?? "—" : metric.label === "Active suppliers" ? summary.metrics.suppliers ?? "—" : metric.label === "Total products" ? summary.metrics.products ?? "?" : metric.label === "Low stock" ? summary.metrics.lowStock ?? "?" : <span aria-label="Not available">—</span>}</p><p className={styles.metricNote}>{metric.note}</p>
       </section>)}</div>
       <div className={styles.chartGrid}>
         <section className={`${styles.panel} ${styles.salesPanel}`}>

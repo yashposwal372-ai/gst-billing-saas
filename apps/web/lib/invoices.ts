@@ -1,9 +1,11 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import { api } from "./api";
 import { paged } from "./catalogue";
 
 const money = z.string().regex(/^\d+(\.\d{2})$/);
 const qty = z.string().regex(/^\d+(\.\d{3})$/);
+const paymentHistorySchema = z.object({ paymentId: z.string().optional(), paymentNumber: z.string().nullable().optional(), paymentDate: z.string().nullable().optional(), amount: money, method: z.string().optional(), status: z.string().optional(), account: z.object({ id: z.string(), accountCode: z.string(), name: z.string(), type: z.string() }).nullable().optional() });
+const settlementSchema = z.object({ paymentStatus: z.enum(["UNAVAILABLE","UNPAID","PARTIAL","PAID"]), paidAmount: money, outstanding: money, paymentHistory: z.array(paymentHistorySchema) }).optional();
 
 export const invoiceLineInputSchema = z.object({
   productId: z.string().uuid(),
@@ -92,6 +94,7 @@ export const invoiceSchema = z.object({
   notes: z.string().nullable().optional(),
   terms: z.string().nullable().optional(),
   lines: z.array(invoiceLineSchema),
+  settlement: settlementSchema,
 });
 export type Invoice = z.infer<typeof invoiceSchema>;
 

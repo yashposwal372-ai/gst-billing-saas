@@ -25,6 +25,7 @@ import {
 } from './invoice-calculator.js';
 
 const invoiceInclude = { lines: { orderBy: { lineNumber: 'asc' } } } as const;
+const invoiceDetailInclude = { lines: { orderBy: { lineNumber: 'asc' as const } }, paymentAllocations: { include: { payment: { include: { account: { select: { id: true, accountCode: true, name: true, type: true } } } } }, orderBy: { createdAt: 'asc' as const } } } as const;
 const D = Prisma.Decimal;
 const ZERO = new D(0);
 const queryStatus = {
@@ -173,10 +174,10 @@ export class InvoicesService {
   async detail(user: SafeUser, id: string) {
     const row = await this.db.invoice.findFirst({
       where: { ...ownerScope(user), id },
-      include: invoiceInclude,
+      include: invoiceDetailInclude,
     });
     if (!row) throw new NotFoundException('Invoice not found');
-    return this.view(row);
+    return this.viewWithSettlement(row as any, 'CUSTOMER_RECEIPT');
   }
 
   async finalize(user: SafeUser, id: string) {
@@ -472,6 +473,18 @@ export class InvoicesService {
 
   private previewView(invoice: Record<string, unknown>, lines: Record<string, unknown>[]) {
     return this.view({ ...invoice, id: null, invoiceNumber: null, sequenceNumber: null, lines, createdAt: null, updatedAt: null });
+  }
+
+  private viewWithSettlement(row: Record<string, unknown> & { lines: Record<string, unknown>[]; paymentAllocations?: any[] }, type: 'CUSTOMER_RECEIPT' | 'SUPPLIER_PAYMENT') {
+    const base = this.view(row);
+    const active = (row.paymentAllocations ?? []).filter((a) => a.payment?.type === type);
+    const posted = active.filter((a) => a.payment?.status === 'POSTED');
+    const paid = posted.reduce((sum, a) => sum.plus(a.amount), ZERO);
+    const grandTotal = row.grandTotal instanceof D ? row.grandTotal : new D(String(row.grandTotal ?? '0'));
+    const outstanding = money(grandTotal.minus(paid));
+    const paymentStatus = row.status !== 'FINALIZED' ? 'UNAVAILABLE' : paid.eq(0) ? 'UNPAID' : outstanding.gt(0) ? 'PARTIAL' : 'PAID';
+    const paymentHistory = active.map((a) => ({ paymentId: a.payment?.id, paymentNumber: a.payment?.paymentNumber, paymentDate: a.payment?.paymentDate ? dateOnly(a.payment.paymentDate) : null, amount: a.amount.toFixed(2), method: a.payment?.method, status: a.payment?.status, account: a.payment?.account ? { id: a.payment.account.id, accountCode: a.payment.account.accountCode, name: a.payment.account.name, type: a.payment.account.type } : null }));
+    return { ...base, settlement: { paymentStatus, paidAmount: paid.toFixed(2), outstanding: outstanding.toFixed(2), paymentHistory } };
   }
 
   private view(row: Record<string, unknown> & { lines: Record<string, unknown>[] }) {

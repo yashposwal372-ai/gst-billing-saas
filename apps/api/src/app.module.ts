@@ -15,6 +15,7 @@ import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { CatalogueModule } from './catalogue/catalogue.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
 import { BusinessDocumentsModule } from './business-documents/business-documents.module.js';
+import { FinanceModule } from './finance/finance.module.js';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { BusinessDocumentsModule } from './business-documents/business-documents
     CatalogueModule,
     InvoicesModule,
     BusinessDocumentsModule,
+    FinanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

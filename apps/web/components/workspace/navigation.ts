@@ -8,7 +8,7 @@ export const navigation: readonly NavigationItem[] = [
   { label: "Inventory", icon: "box", children: ["Products", "Categories", "Stock", "Warehouses", "Stock Transfers", "Barcode"] },
   { label: "Parties", icon: "people", children: ["Customers", "Suppliers"] },
   { label: "Payments", icon: "wallet", children: ["Receivables", "Payables", "Payment History"] },
-  { label: "Expenses", icon: "receipt" }, { label: "Banking", icon: "bank" },
+  { label: "Expenses", icon: "receipt", children: ["Expenses", "Expense Categories"] }, { label: "Banking", icon: "bank", children: ["Accounts", "Account Transfers"] },
   { label: "GST", icon: "receipt", children: ["GST Dashboard", "GST Reports", "GSTR-1", "GSTR-3B", "HSN Summary", "E-Invoice", "E-Way Bill"] },
   { label: "Reports", icon: "chart" }, { label: "Employees", icon: "people" },
   { label: "Notifications", icon: "bell" }, { label: "AI Assistant", icon: "spark" },

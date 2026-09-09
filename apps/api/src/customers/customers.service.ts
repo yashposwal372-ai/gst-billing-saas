@@ -132,17 +132,25 @@ export class CustomersService {
       where: { ...ownerScope(user), id },
     });
     if (!row) throw new NotFoundException('Customer not found');
-    const summary = await this.db.invoice.aggregate({
-      where: { ...ownerScope(user), customerId: id, status: 'FINALIZED' },
-      _sum: { grandTotal: true },
-      _count: { id: true },
-    });
+    const [summary, paid] = await Promise.all([
+      this.db.invoice.aggregate({
+        where: { ...ownerScope(user), customerId: id, status: 'FINALIZED' },
+        _sum: { grandTotal: true },
+        _count: { id: true },
+      }),
+      this.db.paymentAllocation.aggregate({
+        where: { businessId: user.currentBusinessId!, invoice: { customerId: id, status: 'FINALIZED' }, payment: { status: 'POSTED', type: 'CUSTOMER_RECEIPT' } },
+        _sum: { amount: true },
+      }),
+    ]);
+    const sales = summary._sum.grandTotal ?? new Prisma.Decimal(0);
+    const paidAmount = paid._sum.amount ?? new Prisma.Decimal(0);
     return {
       profile: this.profile(row),
       summary: {
-        totalSales: (summary._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2),
-        totalPaid: null,
-        outstanding: null,
+        totalSales: sales.toFixed(2),
+        totalPaid: paidAmount.toFixed(2),
+        outstanding: sales.minus(paidAmount).toFixed(2),
         invoiceCount: summary._count.id,
       },
       dataStatus: 'partial',

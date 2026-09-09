@@ -13,7 +13,7 @@ describe('dashboard HTTP (database double, real auth guard)', () => {
   const user = { id: 'user-a', currentBusinessId: 'business-a', status: 'ACTIVE', authVersion: 0 };
   const session = { id: 'session-a', userId: user.id, user, expiresAt: new Date(Date.now() + 600000), revokedAt: null, authVersion: 0 };
   const membership = { role: 'OWNER', business: { id: 'business-a', name: 'Authorized business', onboardingCompletedAt: new Date(), _count: { customers: 3, suppliers: 2 } } };
-  const db = { product: {count:vi.fn(),fields:{minimumStock:'minimumStock'}}, invoice: { aggregate: vi.fn() }, businessDocument: { aggregate: vi.fn() }, authSession: { findUnique: vi.fn() }, businessMember: { findUnique: vi.fn() } };
+  const db = { product: {count:vi.fn(),fields:{minimumStock:'minimumStock'}}, invoice: { aggregate: vi.fn() }, businessDocument: { aggregate: vi.fn() }, expense: { aggregate: vi.fn() }, paymentAllocation: { aggregate: vi.fn() }, authSession: { findUnique: vi.fn() }, businessMember: { findUnique: vi.fn() } };
   beforeEach(async () => {
     vi.resetAllMocks();
     db.product.count.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
@@ -22,6 +22,8 @@ describe('dashboard HTTP (database double, real auth guard)', () => {
       .mockResolvedValueOnce({ _sum: { grandTotal: new Prisma.Decimal('123.45') } })
       .mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('123.45') } });
     db.businessDocument.aggregate.mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('234.56') } });
+    db.expense.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal('45.67') } });
+    db.paymentAllocation.aggregate.mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal('23.45') } }).mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal('34.56') } }).mockResolvedValue({ _sum: { amount: new Prisma.Decimal('0') } });
     db.authSession.findUnique.mockResolvedValue(session);
     db.businessMember.findUnique.mockResolvedValue(membership);
     const module = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(DatabaseService).useValue(db).compile();
@@ -38,13 +40,16 @@ describe('dashboard HTTP (database double, real auth guard)', () => {
     const result = await get().expect(200);
     expect(result.body.business).toEqual({ id: 'business-a', name: 'Authorized business', role: 'OWNER', onboardingCompleted: true });
     expect(result.body.dataStatus).toBe('not_available');
-    const { customers, suppliers, products, lowStock, todaySales, monthlySales, totalPurchases, ...future } = result.body.metrics;
+    const { customers, suppliers, products, lowStock, todaySales, monthlySales, totalPurchases, totalExpenses, receivables, payables, ...future } = result.body.metrics;
     expect(customers).toBe(3);
     expect(suppliers).toBe(2);
     expect(products).toBe(5);expect(lowStock).toBe(2);
     expect(todaySales).toBe('12.34');
     expect(monthlySales).toBe('123.45');
     expect(totalPurchases).toBe('234.56');
+    expect(totalExpenses).toBe('45.67');
+    expect(receivables).toBe('100.00');
+    expect(payables).toBe('200.00');
     expect(db.product.count.mock.calls[0]![0].where).toMatchObject({businessId:user.currentBusinessId,type:"PRODUCT",isActive:true,business:{memberships:{some:{userId:user.id,role:"OWNER"}}}});
     expect(Object.values(future).every((value) => value === null)).toBe(true);
     expect(db.businessMember.findUnique.mock.calls[0]![0].select.business.select._count.select).toEqual({customers:{where:{isActive:true}},suppliers:{where:{isActive:true}}});

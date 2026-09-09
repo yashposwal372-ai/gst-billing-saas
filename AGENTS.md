@@ -2,7 +2,7 @@
 
 ## Locked product and architecture
 
-Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation, customer/supplier management, products/inventory and GST billing invoices are implemented through Phase 6. Purchases, payments, accounting, reports, portals, staff, AI, subscriptions and administration remain future work.
+Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation, customer/supplier management, products/inventory, GST billing invoices, sales/purchase documents and bookkeeping finance are implemented through Phase 8. GST reports, portals, staff, AI, subscriptions and administration remain future work.
 
 - Frontend: Next.js + React + TypeScript + Tailwind CSS in apps/web, with Zod validation.
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
@@ -10,6 +10,20 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Redis supports cache infrastructure; BullMQ uses Redis for future background work. Avoid unnecessary distributed microservices.
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
+
+## Verified Phase 8 implementation: 2026-09-09
+
+- Started from approved clean Phase 7 checkpoint 53527f95d1a5cf9b8da35b98b649da1ae488791a. No Phase 9 work, push, reset, destructive Prisma operation, Docker installation or forced audit fix was performed.
+- Added Phase 8 finance persistence: MoneyAccount, MoneyAccountEntry, FinanceSequence, Payment, PaymentAllocation, ExpenseCategory, Expense and AccountTransfer plus finance enums and Business.nextAccountNumber. Account codes use the existing atomic business-counter pattern. Payment/expense/transfer numbers are assigned on posting/creation using per-business, per-financial-year finance sequences.
+- Account balances are internal bookkeeping balances, not verified bank balances. Negative balances are allowed. Ledger entries are append-only; posted payments, posted expenses and posted transfers are reversed rather than hard-deleted or rewritten. Full bank account numbers are not stored in MoneyAccount; only optional last four digits and user-entered metadata are retained.
+- Backend APIs added: /accounts, /accounts/:id/transactions, /payments, /payments/:id/post, /payments/:id/reverse, /expense-categories, /expenses, /expenses/:id/post, /expenses/:id/cancel, /account-transfers, /account-transfers/:id/reverse, /receivables and /payables. Existing AuthGuard, BrowserWriteGuard, exact Origin/CSRF, DTO whitelisting and tenant scoping remain in force.
+- Payments support CUSTOMER_RECEIPT allocations to finalized invoices and SUPPLIER_PAYMENT allocations to finalized PURCHASE_BILL documents. Posting requires allocation total to equal payment amount, validates current outstanding, prevents over-allocation, updates account balance and writes ledger entries in a Serializable transaction with bounded P2034 retry. Reversal records reason/actor/time, preserves payment number and writes the opposite ledger effect exactly once through status guards.
+- Invoice and BusinessDocument lifecycle statuses are unchanged. Receivable/payable payment state is derived as UNPAID/PARTIAL/PAID from posted non-reversed allocations. Customer and supplier detail summaries now derive paid/outstanding/payable totals. Dashboard exposes derived receivables, payables and posted monthly expenses. Phase 4 opening balances remain independent entered amounts and are not silently allocated to invoice/bill settlement.
+- Expense categories are business-scoped and normalized unique. Expenses support draft, post and cancel/reversal with EXP numbering and account ledger effects. Expenses are cash/bank outflow records only and do not implement ITC, GST filing or Purchase Bill replacement semantics. Account transfers create paired transfer ledger entries and paired reversal entries.
+- Frontend routes added for accounts, account transactions, payments, expense categories, expenses, account transfers, receivables and payables. Navigation enables Payments, Expenses and Banking destinations. UI copy states that balances are bookkeeping records only and not verified external bank balances.
+- Migration 20260909210000_phase8_payments_expenses_banking was generated offline from the Phase 7 schema and inspected. Migration application NOT RUN; no database reset. Local PostgreSQL localhost:5432 and Redis localhost:6379 remain unavailable unless later verified.
+- Final Phase 8 completion work on 2026-09-09 corrected receivable/payable status filtering so filtered totals and totalPages describe the derived settlement result set before response pagination. Invoice and purchase bill detail views now show backend-derived payment status, paid amount, outstanding/payable amount, payment history and safe Record payment links. Finance UI now uses bounded recorded-account and open-document selectors with allocation rows, payment detail, account detail/edit/ledger routes, expense detail/edit routes and transfer detail routes. Prompt/confirm lifecycle actions were replaced with shared accessible modal dialogs for payment post/reverse, expense post/cancel, transfer reversal and account deactivate/reactivate. Fixture-backed Phase 8 browser smoke passed outside the sandbox at 1440/1024/768/375 for finance routes and full customer receipt create/post/reverse, supplier payment create/post/reverse, expense create/edit/post/cancel, transfer create/post/reverse, account deactivate/reactivate and dialog Escape/Tab focus behavior. PostgreSQL opt-in tests are executable but remain skipped locally without TEST_DATABASE_URL.
+- Phase 9 GST Reports requires explicit new authorization.
 
 ## Verified Phase 7 implementation: 2026-09-09
 
@@ -50,7 +64,7 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Continued the existing Phase 5 working tree above Phase 4 checkpoint 8e2b15b19c9b7e9e42b47efc14a49b0cef56ccef. Preserved implementation; no reset, cleanup, commit, push or Phase 6 work.
 - Category, unified Product (PRODUCT/SERVICE), immutable StockMovement, ItemType/ItemUnit/StockMovementType enums and Business.nextProductNumber are implemented. Category nameKey is case-insensitively unique per business. Product code, optional trimmed case-sensitive SKU and barcode are business-unique. Composite category/product tenant foreign keys and restrictive deletion preserve associations/history.
 - Product codes use PRD-000001 onward; atomic counter increment, insert and nonzero opening movement share one transaction. Rollback and concurrent allocation are designed transactionally but remain unverified on real PostgreSQL.
-- Prices use Decimal(15,2), GST rates Decimal(5,2), quantities Decimal(18,3). DTOs reject numeric JSON, negative/exponent/overprecision amounts; API serializes fixed two/three-place strings. Exact Prisma Decimal arithmetic avoids JS float stock calculation. HSN supports 4/6/8 digits; SAC 6 digits starting 99; GST 0–100 with up to two decimals. Format checks only, not government classification/rate verification or invoice calculation.
+- Prices use Decimal(15,2), GST rates Decimal(5,2), quantities Decimal(18,3). DTOs reject numeric JSON, negative/exponent/overprecision amounts; API serializes fixed two/three-place strings. Exact Prisma Decimal arithmetic avoids JS float stock calculation. HSN supports 4/6/8 digits; SAC 6 digits starting 99; GST 0â€“100 with up to two decimals. Format checks only, not government classification/rate verification or invoice calculation.
 - Units: PCS/NOS/KG/G/LTR/ML/MTR/BOX/PACK/SET/HOUR/DAY/SERVICE. Type, unit and inventory tracking are fixed after creation. Services cannot track stock or accept adjustments. Untracked items reject stock inputs. No unit conversion, valuation, warehouse, batch, serial, transfer or financial models.
 - Product.currentStock plus append-only StockMovement is the stock source of truth. InventoryService owns authoritative writes: nonzero opening stock creates OPENING; zero opening creates no movement. Normal PATCH rejects openingStock/currentStock. Adjustments require active tracked PRODUCT, positive quantity and reason; Serializable transactions retry P2034 at most three attempts, use conditional current-stock updates, reject negative/overflow results, and record quantity/before/after/reason/actor/time atomically. No movement mutation endpoints. DELETE deactivates; PATCH isActive:true reactivates without removing history.
 - CatalogueModule uses existing AuthGuard/BrowserWriteGuard, exact Origin/CSRF and safe API error handling. Trusted current-business OWNER scopes apply to catalogue/category/history/summary queries and writes; client tenant/code and unknown DTO/query properties are rejected. UUID IDs are validated. Auth, refresh rotation, revocation, cookies, CORS and rate limiting were not changed.
@@ -155,8 +169,8 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 4. Customers + Suppliers (implemented; runtime limitations above; stop here).
 5. Products + Inventory (implemented; runtime limitations above; stop here).
 6. GST Billing + Invoice Generation (implemented; runtime limitations above; stop here).
-7. Sales + Purchases.
-8. Payments + Expenses + Banking.
+7. Sales + Purchases (implemented; runtime limitations above; stop here).
+8. Payments + Expenses + Banking (implemented; runtime limitations above; stop here).
 9. GST Reports.
 10. POS Billing.
 11. Warehouses + Branches.

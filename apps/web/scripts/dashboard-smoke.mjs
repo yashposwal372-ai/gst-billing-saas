@@ -1,4 +1,4 @@
-// Standalone browser smoke check using Node 24 + installed Chrome/Edge, no test dependency.
+﻿// Standalone browser smoke check using Node 24 + installed Chrome/Edge, no test dependency.
 // API interception below is test-only. This does not verify real authentication or persistence.
 import assert from 'node:assert/strict';
 import process from 'node:process';
@@ -12,9 +12,10 @@ import { createCatalogueFixtures, runCatalogueSmoke } from './catalogue-smoke.mj
 import { createPartyFixtures, runPartiesSmoke } from './parties-smoke.mjs';
 import { createInvoiceFixtures, runInvoiceSmoke } from './invoice-smoke.mjs';
 import { createPhase7Fixtures, runPhase7Smoke } from './phase7-smoke.mjs';
+import { createPhase8Fixtures, runPhase8Smoke } from './phase8-smoke.mjs';
 
 const webRoot = fileURLToPath(new URL('../', import.meta.url));
-const browserPath = process.argv.slice(2).find(arg => !['--parties','--catalogue','--invoices','--phase7'].includes(arg)) ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const browserPath = process.argv.slice(2).find(arg => !['--parties','--catalogue','--invoices','--phase7','--phase8'].includes(arg)) ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const partyMode = process.argv.includes('--parties');
 const partyFixtures = createPartyFixtures();
 const catalogueMode=process.argv.includes("--catalogue");
@@ -23,6 +24,8 @@ const invoiceMode=process.argv.includes("--invoices");
 const invoiceFixtures=createInvoiceFixtures();
 const phase7Mode=process.argv.includes("--phase7");
 const phase7Fixtures=createPhase7Fixtures();
+const phase8Mode=process.argv.includes("--phase8");
+const phase8Fixtures=createPhase8Fixtures();
 const artifacts = await mkdtemp(join(tmpdir(), 'gst-dashboard-smoke-'));
 const origin = 'http://localhost:3000';
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -61,7 +64,7 @@ try {
   }
   let signedIn = true; let noBusiness = false; let summaryError = false; let slowSummary = false; let logoutCalled = false;
   const testUser = { id: 'ui-test-owner', firstName: 'Aarav', lastName: 'Shah', email: 'owner@example.test', mobile: null, emailVerifiedAt: null, currentBusinessId: 'ui-test-business' };
-  const metricKeys = ['todaySales', 'monthlySales', 'totalSales', 'totalPurchases', 'totalExpenses', 'totalGst', 'receivables', 'customers', 'suppliers', 'products', 'lowStock', 'overdueInvoices'];
+  const metricKeys = ['todaySales', 'monthlySales', 'totalSales', 'totalPurchases', 'totalExpenses', 'totalGst', 'receivables', 'payables', 'customers', 'suppliers', 'products', 'lowStock', 'overdueInvoices'];
   socket.onmessage = async (event) => {
     const message = JSON.parse(event.data);
     if (message.id) {
@@ -72,7 +75,7 @@ try {
     if (message.method === 'Fetch.requestPaused') {
       const { requestId, request } = message.params; const url = new URL(request.url);
       let code = 200; let body = {};
-      const partyResponse = phase7Mode ? await phase7Fixtures.respond(url, request) : invoiceMode ? await invoiceFixtures.respond(url, request) : await catalogueFixtures.respond(url, request) ?? await partyFixtures.respond(url, request);
+      const partyResponse = phase8Mode ? await phase8Fixtures.respond(url, request) : phase7Mode ? await phase7Fixtures.respond(url, request) : invoiceMode ? await invoiceFixtures.respond(url, request) : await catalogueFixtures.respond(url, request) ?? await partyFixtures.respond(url, request);
       if (partyResponse) { code = partyResponse.code; body = partyResponse.body; }
       else if (url.pathname.endsWith('/auth/me')) { code = signedIn ? 200 : 401; body = { user: { ...testUser, currentBusinessId: noBusiness ? null : testUser.currentBusinessId } }; }
       else if (url.pathname.endsWith('/auth/logout')) { signedIn = false; logoutCalled = true; body = { status: 'ok' }; }
@@ -82,9 +85,9 @@ try {
         requestedFilters.push(url.search);
         code = summaryError ? 503 : 200;
         body = summaryError ? { message: 'Internal test error must not be displayed' } : {
-          business: { id: 'ui-test-business', name: 'Shah & Sons Trading Company — A deliberately long business name for responsive layout verification', role: 'OWNER', onboardingCompleted: true },
+          business: { id: 'ui-test-business', name: 'Shah & Sons Trading Company â€” A deliberately long business name for responsive layout verification', role: 'OWNER', onboardingCompleted: true },
           dataStatus: 'not_available', filter: { period: url.searchParams.get('period') ?? 'thisMonth', start: url.searchParams.get('start'), end: url.searchParams.get('end'), timezone: 'Asia/Kolkata' },
-          metrics: Object.fromEntries(metricKeys.map((key) => [key, ['customers','suppliers','products','lowStock'].includes(key) ? 1 : null])), recentActivity: [], charts: { sales: [], gst: [], invoiceStatus: [], paymentMethods: [], topProducts: [] },
+          metrics: Object.fromEntries(metricKeys.map((key) => [key, ['customers','suppliers','products','lowStock'].includes(key) ? 1 : ['todaySales','monthlySales','totalPurchases','totalExpenses','receivables','payables'].includes(key) ? '1.00' : null])), recentActivity: [], charts: { sales: [], gst: [], invoiceStatus: [], paymentMethods: [], topProducts: [] },
         };
       } else if (url.pathname.endsWith('/businesses/current')) body = { business: null };
       else { code = 404; }
@@ -110,7 +113,8 @@ try {
     await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code, windowsVirtualKeyCode });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode });
   };
-  if (phase7Mode) await runPhase7Smoke({send,evaluate,navigate,key,until,artifacts,fixtures:phase7Fixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
+  if (phase8Mode) await runPhase8Smoke({send,evaluate,navigate,key,until,artifacts,fixtures:phase8Fixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
+  else if (phase7Mode) await runPhase7Smoke({send,evaluate,navigate,key,until,artifacts,fixtures:phase7Fixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
   else if (invoiceMode) await runInvoiceSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:invoiceFixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
   else if (catalogueMode) await runCatalogueSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:catalogueFixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
   else if (partyMode) await runPartiesSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:partyFixtures});
@@ -121,14 +125,14 @@ try {
     const sizes = await evaluate(`({ width: innerWidth, documentWidth: document.documentElement.scrollWidth, mainWidth: document.querySelector('main').scrollWidth, mainClient: document.querySelector('main').clientWidth })`);
     assert.ok(sizes.documentWidth <= sizes.width, 'Document overflow at ' + width);
     assert.ok(sizes.mainWidth <= sizes.mainClient, 'Main content overflow at ' + width);
-    assert.equal(await evaluate('document.querySelectorAll("main button:disabled").length'), 2);
+    assert.equal(await evaluate('document.querySelectorAll("main button:disabled").length'), 0);
     assert.ok(await evaluate('document.querySelector("[aria-current=page]") !== null'));
     if (width < 1200) {
       await evaluate(`document.querySelector('[aria-label="Open navigation"]').focus(); document.querySelector('[aria-label="Open navigation"]').click()`);
       assert.equal(await evaluate('document.querySelector("dialog[open]").contains(document.activeElement)'), true);
       await key('Tab'); assert.equal(await evaluate('document.querySelector("dialog[open]").contains(document.activeElement)'), true);
       await evaluate(`Array.from(document.querySelectorAll('dialog[open] summary')).find(item=>item.textContent==='Sales').click()`);
-      assert.equal(await evaluate(`Array.from(document.querySelectorAll('dialog[open] button')).some(button=>button.disabled && button.textContent.includes('Invoices'))`), true);
+      assert.equal(await evaluate(`Array.from(document.querySelectorAll('dialog[open] button')).some(button=>button.disabled && button.textContent.includes('GST Dashboard'))`), true);
       for (let step = 0; step < 15; step++) {
         await key('Tab');
         assert.equal(await evaluate('document.querySelector("dialog[open]").contains(document.activeElement)'), true);
@@ -149,7 +153,7 @@ try {
   await until(() => requestedFilters.some((query) => query.includes('start=2026-04-01') && query.includes('end=2026-09-08')), 'custom filter sent');
   await ready();
   summaryError = true; await navigate('/dashboard');
-  await until(() => evaluate('document.body.innerText.includes("Let’s reconnect")'), 'error state');
+  await until(() => evaluate('document.body.innerText.includes("Letâ€™s reconnect")'), 'error state');
   assert.equal(await evaluate('document.body.innerText.includes("Internal test error")'), false);
   summaryError = false;
   await evaluate(`Array.from(document.querySelectorAll('button')).find(button=>button.textContent==='Try again').click()`); await ready();
@@ -169,9 +173,9 @@ try {
   await until(() => evaluate('location.pathname === "/login"'), 'logout redirect'); assert.equal(logoutCalled, true);
   await navigate('/dashboard'); await until(() => evaluate('location.pathname === "/login"'), 'unauthenticated redirect');
   }
-  const relevantPageErrors = phase7Mode ? pageErrors.filter((error) => error !== "Uncaught (in promise)") : pageErrors;
+  const relevantPageErrors = phase8Mode ? pageErrors.filter((error) => error !== 'Uncaught (in promise)') : phase7Mode ? pageErrors.filter((error) => error !== "Uncaught (in promise)") : pageErrors;
   assert.deepEqual(relevantPageErrors, []);
-  console.log(phase7Mode ? 'PASS Phase 7 workflows using test-only API fixtures' : invoiceMode ? 'PASS invoice workflows using test-only API fixtures' : catalogueMode ? 'PASS catalogue workflows using test-only API fixtures' : partyMode ? 'PASS party workflows using test-only API fixtures' : 'PASS custom dates, error/retry, skeleton, auth redirects, account Escape and logout');
+  console.log(phase8Mode ? 'PASS Phase 8 workflows using test-only API fixtures' : phase7Mode ? 'PASS Phase 7 workflows using test-only API fixtures' : invoiceMode ? 'PASS invoice workflows using test-only API fixtures' : catalogueMode ? 'PASS catalogue workflows using test-only API fixtures' : partyMode ? 'PASS party workflows using test-only API fixtures' : 'PASS custom dates, error/retry, skeleton, auth redirects, account Escape and logout');
   console.log('Test-only API fixtures used. Screenshots:', artifacts);
   await send('Browser.close', {}, null).catch(() => {});
 } finally {

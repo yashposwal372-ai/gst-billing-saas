@@ -19,6 +19,9 @@ export class DashboardService {
     let todaySales: string | null = null;
     let monthlySales: string | null = null;
     let totalPurchases: string | null = null;
+    let totalExpenses: string | null = null;
+    let receivables: string | null = null;
+    let payables: string | null = null;
     if (user.currentBusinessId) {
       const membership = await this.db.businessMember.findUnique({
         where: { userId_businessId: { userId: user.id, businessId: user.currentBusinessId } },
@@ -43,7 +46,7 @@ export class DashboardService {
         ...ownerScope(user),
         status: 'FINALIZED' as const,
       };
-      const [today, month, purchases] = await Promise.all([
+      const [today, month, purchases, expenses, receiptAllocations, paymentAllocations] = await Promise.all([
         this.db.invoice.aggregate({
           where: { ...salesWhere, invoiceDate: { gte: day, lte: day } },
           _sum: { grandTotal: true },
@@ -59,6 +62,18 @@ export class DashboardService {
           where: { ...ownerScope(user), documentType: 'PURCHASE_BILL', status: 'FINALIZED', documentDate: { gte: monthStart, lte: day } },
           _sum: { grandTotal: true },
         }),
+        this.db.expense.aggregate({
+          where: { ...ownerScope(user), status: 'POSTED', expenseDate: { gte: monthStart, lte: day } },
+          _sum: { amount: true },
+        }),
+        this.db.paymentAllocation.aggregate({
+          where: { businessId: user.currentBusinessId, invoice: { status: 'FINALIZED' }, payment: { status: 'POSTED', type: 'CUSTOMER_RECEIPT' } },
+          _sum: { amount: true },
+        }),
+        this.db.paymentAllocation.aggregate({
+          where: { businessId: user.currentBusinessId, document: { documentType: 'PURCHASE_BILL', status: 'FINALIZED' }, payment: { status: 'POSTED', type: 'SUPPLIER_PAYMENT' } },
+          _sum: { amount: true },
+        }),
       ]);
       if (filter.start && filter.end) await this.db.invoice.aggregate({
         where: {
@@ -70,11 +85,14 @@ export class DashboardService {
       todaySales = (today._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2);
       monthlySales = (month._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2);
       totalPurchases = (purchases._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2);
+      totalExpenses = (expenses._sum.amount ?? new Prisma.Decimal(0)).toFixed(2);
+      receivables = (month._sum.grandTotal ?? new Prisma.Decimal(0)).minus(receiptAllocations._sum.amount ?? new Prisma.Decimal(0)).toFixed(2);
+      payables = (purchases._sum.grandTotal ?? new Prisma.Decimal(0)).minus(paymentAllocations._sum.amount ?? new Prisma.Decimal(0)).toFixed(2);
     }
     return {
       business, filter, dataStatus: 'not_available' as const,
       metrics: { todaySales, monthlySales, totalSales: null, totalPurchases,
-        totalExpenses: null, totalGst: null, receivables: null, customers, suppliers,
+        totalExpenses, totalGst: null, receivables, payables, customers, suppliers,
         products, lowStock, overdueInvoices: null },
       recentActivity: [],
       charts: { sales: [], gst: [], invoiceStatus: [], paymentMethods: [], topProducts: [] },

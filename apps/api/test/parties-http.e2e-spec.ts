@@ -94,6 +94,7 @@ describe.each(['customers', 'suppliers'] as const)(
       customer: delegate,
       invoice: { aggregate: vi.fn() },
       businessDocument: { aggregate: vi.fn(), count: vi.fn() },
+      paymentAllocation: { aggregate: vi.fn() },
       supplier: delegate,
       $transaction: vi.fn(),
     };
@@ -105,6 +106,7 @@ describe.each(['customers', 'suppliers'] as const)(
       db.invoice.aggregate.mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('456.78') }, _count: { id: 3 } });
       db.businessDocument.aggregate.mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('345.67') } });
       db.businessDocument.count.mockResolvedValue(4);
+      db.paymentAllocation.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal('111.11') } });
       db.$transaction.mockImplementation((fn) => fn(db));
       delegate.create.mockImplementation(({ data }) => ({
         ...stored,
@@ -268,13 +270,13 @@ describe.each(['customers', 'suppliers'] as const)(
       if (kind === 'customers') {
         expect(result.body.summary.totalSales).toBe('456.78');
         expect(result.body.summary.invoiceCount).toBe(3);
-        expect(result.body.summary.totalPaid).toBeNull();
-        expect(result.body.summary.outstanding).toBeNull();
+        expect(result.body.summary.totalPaid).toBe('111.11');
+        expect(result.body.summary.outstanding).toBe('345.67');
       } else {
         expect(result.body.summary.totalPurchases).toBe('345.67');
         expect(result.body.summary.purchaseCount).toBe(4);
-        expect(result.body.summary.amountPaid).toBeNull();
-        expect(result.body.summary.amountPayable).toBeNull();
+        expect(result.body.summary.amountPaid).toBe('111.11');
+        expect(result.body.summary.amountPayable).toBe('234.56');
       }
       expect(delegate.findFirst.mock.calls[0]![0].where).toMatchObject({
         id,

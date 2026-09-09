@@ -76,6 +76,68 @@ enum BusinessDocumentStatus {
   CANCELLED
 }
 
+enum MoneyAccountType {
+  CASH
+  BANK
+  UPI
+  OTHER
+}
+
+enum AccountEntryType {
+  OPENING_BALANCE
+  CUSTOMER_RECEIPT
+  SUPPLIER_PAYMENT
+  EXPENSE
+  TRANSFER_IN
+  TRANSFER_OUT
+  PAYMENT_REVERSAL
+  EXPENSE_REVERSAL
+  TRANSFER_REVERSAL
+}
+
+enum AccountEntryDirection {
+  CREDIT
+  DEBIT
+}
+
+enum PaymentType {
+  CUSTOMER_RECEIPT
+  SUPPLIER_PAYMENT
+}
+
+enum PaymentStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CARD
+  CHEQUE
+  OTHER
+}
+
+enum FinanceSequenceType {
+  CUSTOMER_RECEIPT
+  SUPPLIER_PAYMENT
+  EXPENSE
+  TRANSFER
+}
+
+enum ExpenseStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum TransferStatus {
+  POSTED
+  REVERSED
+}
+
 model Category {
   id          String    @id @default(uuid()) @db.Uuid
   businessId  String    @db.Uuid
@@ -204,6 +266,7 @@ model Customer {
   creditLimit           Decimal?           @db.Decimal(15, 2)
   invoices              Invoice[]
   businessDocuments     BusinessDocument[]
+  payments              Payment[]
 
   @@unique([id, businessId])
   @@unique([businessId, customerCode])
@@ -245,6 +308,8 @@ model Supplier {
   ifsc               String?            @db.Char(11)
   upiId              String?            @db.VarChar(100)
   businessDocuments  BusinessDocument[]
+  payments           Payment[]
+  expenses           Expense[]
 
   @@unique([id, businessId])
   @@unique([businessId, supplierCode])
@@ -282,27 +347,38 @@ enum GstMode {
 }
 
 model User {
-  stockMovements          StockMovement[]
-  createdInvoices         Invoice[]                @relation("CreatedInvoices")
-  finalizedInvoices       Invoice[]                @relation("FinalizedInvoices")
-  cancelledInvoices       Invoice[]                @relation("CancelledInvoices")
-  id                      String                   @id @default(uuid()) @db.Uuid
-  email                   String                   @unique @db.VarChar(254)
-  mobile                  String?                  @db.VarChar(16)
-  passwordHash            String
-  firstName               String                   @db.VarChar(80)
-  lastName                String                   @db.VarChar(80)
-  emailVerifiedAt         DateTime?
-  status                  UserStatus               @default(ACTIVE)
-  authVersion             Int                      @default(0)
-  currentBusinessId       String?                  @db.Uuid
-  currentBusiness         Business?                @relation("CurrentBusiness", fields: [currentBusinessId], references: [id], onDelete: SetNull)
-  memberships             BusinessMember[]
-  sessions                AuthSession[]
-  passwordResetTokens     PasswordResetToken[]
-  emailVerificationTokens EmailVerificationToken[]
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  stockMovements           StockMovement[]
+  createdInvoices          Invoice[]                @relation("CreatedInvoices")
+  finalizedInvoices        Invoice[]                @relation("FinalizedInvoices")
+  cancelledInvoices        Invoice[]                @relation("CancelledInvoices")
+  createdMoneyAccounts     MoneyAccount[]           @relation("CreatedMoneyAccounts")
+  accountEntries           MoneyAccountEntry[]      @relation("CreatedAccountEntries")
+  createdPayments          Payment[]                @relation("CreatedPayments")
+  postedPayments           Payment[]                @relation("PostedPayments")
+  reversedPayments         Payment[]                @relation("ReversedPayments")
+  createdExpenseCategories ExpenseCategory[]        @relation("CreatedExpenseCategories")
+  createdExpenses          Expense[]                @relation("CreatedExpenses")
+  postedExpenses           Expense[]                @relation("PostedExpenses")
+  cancelledExpenses        Expense[]                @relation("CancelledExpenses")
+  createdTransfers         AccountTransfer[]        @relation("CreatedTransfers")
+  reversedTransfers        AccountTransfer[]        @relation("ReversedTransfers")
+  id                       String                   @id @default(uuid()) @db.Uuid
+  email                    String                   @unique @db.VarChar(254)
+  mobile                   String?                  @db.VarChar(16)
+  passwordHash             String
+  firstName                String                   @db.VarChar(80)
+  lastName                 String                   @db.VarChar(80)
+  emailVerifiedAt          DateTime?
+  status                   UserStatus               @default(ACTIVE)
+  authVersion              Int                      @default(0)
+  currentBusinessId        String?                  @db.Uuid
+  currentBusiness          Business?                @relation("CurrentBusiness", fields: [currentBusinessId], references: [id], onDelete: SetNull)
+  memberships              BusinessMember[]
+  sessions                 AuthSession[]
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 
   @@index([currentBusinessId])
 }
@@ -368,7 +444,16 @@ model Business {
   invoiceSequences      InvoiceSequence[]
   businessDocuments     BusinessDocument[]
   documentSequences     BusinessDocumentSequence[]
+  moneyAccounts         MoneyAccount[]
+  accountEntries        MoneyAccountEntry[]
+  financeSequences      FinanceSequence[]
+  payments              Payment[]
+  paymentAllocations    PaymentAllocation[]
+  expenseCategories     ExpenseCategory[]
+  expenses              Expense[]
+  accountTransfers      AccountTransfer[]
   nextProductNumber     Int                        @default(0)
+  nextAccountNumber     Int                        @default(0)
   customers             Customer[]
   suppliers             Supplier[]
   nextCustomerNumber    Int                        @default(0)
@@ -418,79 +503,80 @@ model InvoiceSequence {
 }
 
 model Invoice {
-  id                     String           @id @default(uuid()) @db.Uuid
-  businessId             String           @db.Uuid
-  business               Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  status                 InvoiceStatus    @default(DRAFT)
-  invoiceNumber          String?          @db.VarChar(40)
+  id                     String              @id @default(uuid()) @db.Uuid
+  businessId             String              @db.Uuid
+  business               Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  status                 InvoiceStatus       @default(DRAFT)
+  invoiceNumber          String?             @db.VarChar(40)
   sequenceNumber         Int?
-  financialYear          String           @db.Char(7)
-  invoiceDate            DateTime         @db.Date
-  dueDate                DateTime?        @db.Date
-  customerId             String?          @db.Uuid
-  customer               Customer?        @relation(fields: [customerId, businessId], references: [id, businessId], onDelete: Restrict)
-  placeOfSupplyState     String           @db.VarChar(80)
-  placeOfSupplyStateCode String           @db.Char(2)
-  gstApplicable          Boolean          @default(false)
-  priceMode              InvoicePriceMode @default(EXCLUSIVE)
-  notes                  String?          @db.VarChar(2000)
-  terms                  String?          @db.VarChar(2000)
-  sellerBusinessName     String           @db.VarChar(160)
-  sellerLegalName        String?          @db.VarChar(160)
-  sellerGstin            String?          @db.VarChar(15)
-  sellerPan              String?          @db.VarChar(10)
-  sellerAddressLine1     String           @db.VarChar(200)
-  sellerAddressLine2     String?          @db.VarChar(200)
-  sellerCity             String           @db.VarChar(80)
-  sellerState            String           @db.VarChar(80)
-  sellerStateCode        String           @db.Char(2)
-  sellerPincode          String           @db.Char(6)
-  sellerBankName         String?          @db.VarChar(120)
-  sellerAccountHolder    String?          @db.VarChar(160)
-  sellerAccountNumber    String?          @db.VarChar(34)
-  sellerIfsc             String?          @db.Char(11)
-  sellerUpiId            String?          @db.VarChar(100)
-  customerCodeSnapshot   String?          @db.VarChar(20)
-  customerNameSnapshot   String           @db.VarChar(160)
-  customerBusinessName   String?          @db.VarChar(160)
-  customerGstinSnapshot  String?          @db.VarChar(15)
-  customerPanSnapshot    String?          @db.VarChar(10)
-  customerPhoneSnapshot  String?          @db.VarChar(16)
-  customerEmailSnapshot  String?          @db.VarChar(254)
-  billingAddressLine1    String           @db.VarChar(200)
-  billingAddressLine2    String?          @db.VarChar(200)
-  billingCity            String           @db.VarChar(80)
-  billingState           String           @db.VarChar(80)
-  billingStateCode       String           @db.Char(2)
-  billingPincode         String           @db.Char(6)
-  shippingAddressLine1   String?          @db.VarChar(200)
-  shippingAddressLine2   String?          @db.VarChar(200)
-  shippingCity           String?          @db.VarChar(80)
-  shippingState          String?          @db.VarChar(80)
-  shippingStateCode      String?          @db.Char(2)
-  shippingPincode        String?          @db.VarChar(6)
-  subtotal               Decimal          @default(0) @db.Decimal(15, 2)
-  discountTotal          Decimal          @default(0) @db.Decimal(15, 2)
-  taxableTotal           Decimal          @default(0) @db.Decimal(15, 2)
-  cgstTotal              Decimal          @default(0) @db.Decimal(15, 2)
-  sgstTotal              Decimal          @default(0) @db.Decimal(15, 2)
-  igstTotal              Decimal          @default(0) @db.Decimal(15, 2)
-  taxTotal               Decimal          @default(0) @db.Decimal(15, 2)
-  roundOff               Decimal          @default(0) @db.Decimal(15, 2)
-  grandTotal             Decimal          @default(0) @db.Decimal(15, 2)
+  financialYear          String              @db.Char(7)
+  invoiceDate            DateTime            @db.Date
+  dueDate                DateTime?           @db.Date
+  customerId             String?             @db.Uuid
+  customer               Customer?           @relation(fields: [customerId, businessId], references: [id, businessId], onDelete: Restrict)
+  placeOfSupplyState     String              @db.VarChar(80)
+  placeOfSupplyStateCode String              @db.Char(2)
+  gstApplicable          Boolean             @default(false)
+  priceMode              InvoicePriceMode    @default(EXCLUSIVE)
+  notes                  String?             @db.VarChar(2000)
+  terms                  String?             @db.VarChar(2000)
+  sellerBusinessName     String              @db.VarChar(160)
+  sellerLegalName        String?             @db.VarChar(160)
+  sellerGstin            String?             @db.VarChar(15)
+  sellerPan              String?             @db.VarChar(10)
+  sellerAddressLine1     String              @db.VarChar(200)
+  sellerAddressLine2     String?             @db.VarChar(200)
+  sellerCity             String              @db.VarChar(80)
+  sellerState            String              @db.VarChar(80)
+  sellerStateCode        String              @db.Char(2)
+  sellerPincode          String              @db.Char(6)
+  sellerBankName         String?             @db.VarChar(120)
+  sellerAccountHolder    String?             @db.VarChar(160)
+  sellerAccountNumber    String?             @db.VarChar(34)
+  sellerIfsc             String?             @db.Char(11)
+  sellerUpiId            String?             @db.VarChar(100)
+  customerCodeSnapshot   String?             @db.VarChar(20)
+  customerNameSnapshot   String              @db.VarChar(160)
+  customerBusinessName   String?             @db.VarChar(160)
+  customerGstinSnapshot  String?             @db.VarChar(15)
+  customerPanSnapshot    String?             @db.VarChar(10)
+  customerPhoneSnapshot  String?             @db.VarChar(16)
+  customerEmailSnapshot  String?             @db.VarChar(254)
+  billingAddressLine1    String              @db.VarChar(200)
+  billingAddressLine2    String?             @db.VarChar(200)
+  billingCity            String              @db.VarChar(80)
+  billingState           String              @db.VarChar(80)
+  billingStateCode       String              @db.Char(2)
+  billingPincode         String              @db.Char(6)
+  shippingAddressLine1   String?             @db.VarChar(200)
+  shippingAddressLine2   String?             @db.VarChar(200)
+  shippingCity           String?             @db.VarChar(80)
+  shippingState          String?             @db.VarChar(80)
+  shippingStateCode      String?             @db.Char(2)
+  shippingPincode        String?             @db.VarChar(6)
+  subtotal               Decimal             @default(0) @db.Decimal(15, 2)
+  discountTotal          Decimal             @default(0) @db.Decimal(15, 2)
+  taxableTotal           Decimal             @default(0) @db.Decimal(15, 2)
+  cgstTotal              Decimal             @default(0) @db.Decimal(15, 2)
+  sgstTotal              Decimal             @default(0) @db.Decimal(15, 2)
+  igstTotal              Decimal             @default(0) @db.Decimal(15, 2)
+  taxTotal               Decimal             @default(0) @db.Decimal(15, 2)
+  roundOff               Decimal             @default(0) @db.Decimal(15, 2)
+  grandTotal             Decimal             @default(0) @db.Decimal(15, 2)
   finalizedAt            DateTime?
-  finalizedById          String?          @db.Uuid
-  finalizedBy            User?            @relation("FinalizedInvoices", fields: [finalizedById], references: [id], onDelete: Restrict)
+  finalizedById          String?             @db.Uuid
+  finalizedBy            User?               @relation("FinalizedInvoices", fields: [finalizedById], references: [id], onDelete: Restrict)
   cancelledAt            DateTime?
-  cancelledById          String?          @db.Uuid
-  cancelledBy            User?            @relation("CancelledInvoices", fields: [cancelledById], references: [id], onDelete: Restrict)
-  cancellationReason     String?          @db.VarChar(500)
-  createdById            String           @db.Uuid
-  createdBy              User             @relation("CreatedInvoices", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
+  cancelledById          String?             @db.Uuid
+  cancelledBy            User?               @relation("CancelledInvoices", fields: [cancelledById], references: [id], onDelete: Restrict)
+  cancellationReason     String?             @db.VarChar(500)
+  createdById            String              @db.Uuid
+  createdBy              User                @relation("CreatedInvoices", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
   lines                  InvoiceLine[]
   stockMovements         StockMovement[]
+  paymentAllocations     PaymentAllocation[]
 
   @@unique([id, businessId])
   @@unique([businessId, invoiceNumber])
@@ -628,6 +714,7 @@ model BusinessDocument {
   updatedAt              DateTime               @updatedAt
   lines                  BusinessDocumentLine[]
   stockMovements         StockMovement[]
+  paymentAllocations     PaymentAllocation[]
 
   @@unique([id, businessId])
   @@unique([businessId, documentNumber])
@@ -675,4 +762,230 @@ model BusinessDocumentLine {
   @@index([businessId, productId])
   @@index([businessId, sourceInvoiceLineId])
   @@index([businessId, sourceDocumentLineId])
+}
+
+model MoneyAccount {
+  id                 String              @id @default(uuid()) @db.Uuid
+  businessId         String              @db.Uuid
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  accountCode        String              @db.VarChar(20)
+  name               String              @db.VarChar(120)
+  type               MoneyAccountType
+  bankName           String?             @db.VarChar(120)
+  accountNumberLast4 String?             @db.Char(4)
+  ifsc               String?             @db.Char(11)
+  upiId              String?             @db.VarChar(100)
+  openingBalance     Decimal             @default(0) @db.Decimal(15, 2)
+  currentBalance     Decimal             @default(0) @db.Decimal(15, 2)
+  isActive           Boolean             @default(true)
+  createdById        String              @db.Uuid
+  createdBy          User                @relation("CreatedMoneyAccounts", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  entries            MoneyAccountEntry[]
+  payments           Payment[]
+  expenses           Expense[]
+  transfersFrom      AccountTransfer[]   @relation("TransferFromAccount")
+  transfersTo        AccountTransfer[]   @relation("TransferToAccount")
+
+  @@unique([id, businessId])
+  @@unique([businessId, accountCode])
+  @@index([businessId, isActive, type])
+  @@index([businessId, name])
+}
+
+model MoneyAccountEntry {
+  id            String                @id @default(uuid()) @db.Uuid
+  businessId    String                @db.Uuid
+  business      Business              @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  accountId     String                @db.Uuid
+  account       MoneyAccount          @relation(fields: [accountId, businessId], references: [id, businessId], onDelete: Restrict)
+  type          AccountEntryType
+  direction     AccountEntryDirection
+  amount        Decimal               @db.Decimal(15, 2)
+  balanceBefore Decimal               @db.Decimal(15, 2)
+  balanceAfter  Decimal               @db.Decimal(15, 2)
+  paymentId     String?               @db.Uuid
+  payment       Payment?              @relation(fields: [paymentId, businessId], references: [id, businessId], onDelete: Restrict)
+  expenseId     String?               @db.Uuid
+  expense       Expense?              @relation(fields: [expenseId, businessId], references: [id, businessId], onDelete: Restrict)
+  transferId    String?               @db.Uuid
+  transfer      AccountTransfer?      @relation(fields: [transferId, businessId], references: [id, businessId], onDelete: Restrict)
+  referenceType String?               @db.VarChar(40)
+  referenceId   String?               @db.VarChar(80)
+  description   String?               @db.VarChar(500)
+  createdById   String                @db.Uuid
+  createdBy     User                  @relation("CreatedAccountEntries", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime              @default(now())
+
+  @@index([businessId, accountId, createdAt])
+  @@index([businessId, paymentId])
+  @@index([businessId, expenseId])
+  @@index([businessId, transferId])
+}
+
+model FinanceSequence {
+  id            String              @id @default(uuid()) @db.Uuid
+  businessId    String              @db.Uuid
+  business      Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  type          FinanceSequenceType
+  financialYear String              @db.Char(7)
+  nextNumber    Int                 @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([businessId, type, financialYear])
+}
+
+model Payment {
+  id              String              @id @default(uuid()) @db.Uuid
+  businessId      String              @db.Uuid
+  business        Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  paymentNumber   String?             @db.VarChar(40)
+  sequenceNumber  Int?
+  financialYear   String              @db.Char(7)
+  type            PaymentType
+  customerId      String?             @db.Uuid
+  customer        Customer?           @relation(fields: [customerId, businessId], references: [id, businessId], onDelete: Restrict)
+  supplierId      String?             @db.Uuid
+  supplier        Supplier?           @relation(fields: [supplierId, businessId], references: [id, businessId], onDelete: Restrict)
+  accountId       String              @db.Uuid
+  account         MoneyAccount        @relation(fields: [accountId, businessId], references: [id, businessId], onDelete: Restrict)
+  paymentDate     DateTime            @db.Date
+  method          PaymentMethod
+  referenceNumber String?             @db.VarChar(120)
+  amount          Decimal             @db.Decimal(15, 2)
+  notes           String?             @db.VarChar(2000)
+  status          PaymentStatus       @default(DRAFT)
+  postedAt        DateTime?
+  postedById      String?             @db.Uuid
+  postedBy        User?               @relation("PostedPayments", fields: [postedById], references: [id], onDelete: Restrict)
+  reversedAt      DateTime?
+  reversedById    String?             @db.Uuid
+  reversedBy      User?               @relation("ReversedPayments", fields: [reversedById], references: [id], onDelete: Restrict)
+  reversalReason  String?             @db.VarChar(500)
+  createdById     String              @db.Uuid
+  createdBy       User                @relation("CreatedPayments", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  allocations     PaymentAllocation[]
+  accountEntries  MoneyAccountEntry[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, paymentNumber])
+  @@index([businessId, type, status, paymentDate])
+  @@index([businessId, customerId])
+  @@index([businessId, supplierId])
+  @@index([businessId, accountId])
+}
+
+model PaymentAllocation {
+  id         String            @id @default(uuid()) @db.Uuid
+  businessId String            @db.Uuid
+  business   Business          @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  paymentId  String            @db.Uuid
+  payment    Payment           @relation(fields: [paymentId, businessId], references: [id, businessId], onDelete: Cascade)
+  invoiceId  String?           @db.Uuid
+  invoice    Invoice?          @relation(fields: [invoiceId, businessId], references: [id, businessId], onDelete: Restrict)
+  documentId String?           @db.Uuid
+  document   BusinessDocument? @relation(fields: [documentId, businessId], references: [id, businessId], onDelete: Restrict)
+  amount     Decimal           @db.Decimal(15, 2)
+  createdAt  DateTime          @default(now())
+
+  @@index([businessId, paymentId])
+  @@index([businessId, invoiceId])
+  @@index([businessId, documentId])
+}
+
+model ExpenseCategory {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  name        String    @db.VarChar(120)
+  nameKey     String    @db.VarChar(120)
+  description String?   @db.VarChar(1000)
+  isActive    Boolean   @default(true)
+  createdById String    @db.Uuid
+  createdBy   User      @relation("CreatedExpenseCategories", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expenses    Expense[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, nameKey])
+  @@index([businessId, isActive, name])
+}
+
+model Expense {
+  id                 String              @id @default(uuid()) @db.Uuid
+  businessId         String              @db.Uuid
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  expenseNumber      String?             @db.VarChar(40)
+  sequenceNumber     Int?
+  financialYear      String              @db.Char(7)
+  categoryId         String              @db.Uuid
+  category           ExpenseCategory     @relation(fields: [categoryId, businessId], references: [id, businessId], onDelete: Restrict)
+  accountId          String              @db.Uuid
+  account            MoneyAccount        @relation(fields: [accountId, businessId], references: [id, businessId], onDelete: Restrict)
+  supplierId         String?             @db.Uuid
+  supplier           Supplier?           @relation(fields: [supplierId, businessId], references: [id, businessId], onDelete: Restrict)
+  expenseDate        DateTime            @db.Date
+  description        String              @db.VarChar(500)
+  amount             Decimal             @db.Decimal(15, 2)
+  method             PaymentMethod
+  referenceNumber    String?             @db.VarChar(120)
+  notes              String?             @db.VarChar(2000)
+  status             ExpenseStatus       @default(DRAFT)
+  postedAt           DateTime?
+  postedById         String?             @db.Uuid
+  postedBy           User?               @relation("PostedExpenses", fields: [postedById], references: [id], onDelete: Restrict)
+  cancelledAt        DateTime?
+  cancelledById      String?             @db.Uuid
+  cancelledBy        User?               @relation("CancelledExpenses", fields: [cancelledById], references: [id], onDelete: Restrict)
+  cancellationReason String?             @db.VarChar(500)
+  createdById        String              @db.Uuid
+  createdBy          User                @relation("CreatedExpenses", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  accountEntries     MoneyAccountEntry[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, expenseNumber])
+  @@index([businessId, status, expenseDate])
+  @@index([businessId, categoryId])
+  @@index([businessId, accountId])
+  @@index([businessId, supplierId])
+}
+
+model AccountTransfer {
+  id              String              @id @default(uuid()) @db.Uuid
+  businessId      String              @db.Uuid
+  business        Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  transferNumber  String              @db.VarChar(40)
+  sequenceNumber  Int
+  financialYear   String              @db.Char(7)
+  fromAccountId   String              @db.Uuid
+  fromAccount     MoneyAccount        @relation("TransferFromAccount", fields: [fromAccountId, businessId], references: [id, businessId], onDelete: Restrict)
+  toAccountId     String              @db.Uuid
+  toAccount       MoneyAccount        @relation("TransferToAccount", fields: [toAccountId, businessId], references: [id, businessId], onDelete: Restrict)
+  transferDate    DateTime            @db.Date
+  amount          Decimal             @db.Decimal(15, 2)
+  referenceNumber String?             @db.VarChar(120)
+  notes           String?             @db.VarChar(2000)
+  status          TransferStatus      @default(POSTED)
+  reversedAt      DateTime?
+  reversedById    String?             @db.Uuid
+  reversedBy      User?               @relation("ReversedTransfers", fields: [reversedById], references: [id], onDelete: Restrict)
+  reversalReason  String?             @db.VarChar(500)
+  createdById     String              @db.Uuid
+  createdBy       User                @relation("CreatedTransfers", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  accountEntries  MoneyAccountEntry[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, transferNumber])
+  @@index([businessId, status, transferDate])
+  @@index([businessId, fromAccountId])
+  @@index([businessId, toAccountId])
 }
