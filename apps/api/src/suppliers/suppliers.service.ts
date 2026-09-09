@@ -117,19 +117,29 @@ export class SuppliersService {
     return { ...serialize(profile) };
   }
   async detail(user: SafeUser, id: string) {
+    const scope = ownerScope(user);
     const row = await this.db.supplier.findFirst({
-      where: { ...ownerScope(user), id },
+      where: { ...scope, id },
     });
     if (!row) throw new NotFoundException('Supplier not found');
+    const [purchaseTotals, purchaseCount] = await Promise.all([
+      this.db.businessDocument.aggregate({
+        where: { ...scope, supplierId: id, documentType: 'PURCHASE_BILL', status: 'FINALIZED' },
+        _sum: { grandTotal: true },
+      }),
+      this.db.businessDocument.count({
+        where: { ...scope, supplierId: id, documentType: 'PURCHASE_BILL', status: 'FINALIZED' },
+      }),
+    ]);
     return {
       profile: this.profile(row),
       summary: {
-        totalPurchases: null,
+        totalPurchases: (purchaseTotals._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2),
         amountPaid: null,
         amountPayable: null,
-        purchaseCount: null,
+        purchaseCount,
       },
-      dataStatus: 'not_available',
+      dataStatus: 'partial',
       ledgerEntries: [],
       activity: [],
     };

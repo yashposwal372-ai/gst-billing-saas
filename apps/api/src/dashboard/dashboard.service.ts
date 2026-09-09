@@ -18,6 +18,7 @@ export class DashboardService {
     let lowStock: number | null = null;
     let todaySales: string | null = null;
     let monthlySales: string | null = null;
+    let totalPurchases: string | null = null;
     if (user.currentBusinessId) {
       const membership = await this.db.businessMember.findUnique({
         where: { userId_businessId: { userId: user.id, businessId: user.currentBusinessId } },
@@ -42,7 +43,7 @@ export class DashboardService {
         ...ownerScope(user),
         status: 'FINALIZED' as const,
       };
-      const [today, month] = await Promise.all([
+      const [today, month, purchases] = await Promise.all([
         this.db.invoice.aggregate({
           where: { ...salesWhere, invoiceDate: { gte: day, lte: day } },
           _sum: { grandTotal: true },
@@ -52,6 +53,10 @@ export class DashboardService {
             ...salesWhere,
             invoiceDate: { gte: monthStart, lte: day },
           },
+          _sum: { grandTotal: true },
+        }),
+        this.db.businessDocument.aggregate({
+          where: { ...ownerScope(user), documentType: 'PURCHASE_BILL', status: 'FINALIZED', documentDate: { gte: monthStart, lte: day } },
           _sum: { grandTotal: true },
         }),
       ]);
@@ -64,10 +69,11 @@ export class DashboardService {
       });
       todaySales = (today._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2);
       monthlySales = (month._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2);
+      totalPurchases = (purchases._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2);
     }
     return {
       business, filter, dataStatus: 'not_available' as const,
-      metrics: { todaySales, monthlySales, totalSales: null, totalPurchases: null,
+      metrics: { todaySales, monthlySales, totalSales: null, totalPurchases,
         totalExpenses: null, totalGst: null, receivables: null, customers, suppliers,
         products, lowStock, overdueInvoices: null },
       recentActivity: [],

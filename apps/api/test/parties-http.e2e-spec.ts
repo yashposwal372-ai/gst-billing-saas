@@ -93,6 +93,7 @@ describe.each(['customers', 'suppliers'] as const)(
       business: { update: vi.fn() },
       customer: delegate,
       invoice: { aggregate: vi.fn() },
+      businessDocument: { aggregate: vi.fn(), count: vi.fn() },
       supplier: delegate,
       $transaction: vi.fn(),
     };
@@ -102,6 +103,8 @@ describe.each(['customers', 'suppliers'] as const)(
       db.businessMember.findUnique.mockResolvedValue({ role: 'OWNER' });
       db.business.update.mockResolvedValue({ [counter]: 1 });
       db.invoice.aggregate.mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('456.78') }, _count: { id: 3 } });
+      db.businessDocument.aggregate.mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('345.67') } });
+      db.businessDocument.count.mockResolvedValue(4);
       db.$transaction.mockImplementation((fn) => fn(db));
       delegate.create.mockImplementation(({ data }) => ({
         ...stored,
@@ -258,7 +261,7 @@ describe.each(['customers', 'suppliers'] as const)(
     ])('rejects invalid query %s', async (query) => {
       await get(query).expect(400);
     });
-    it('returns detail with empty ledger and current Phase 6 customer sales totals', async () => {
+    it('returns detail with empty ledger and current Phase 7 party totals', async () => {
       const result = await get('/' + id).expect(200);
       expect(result.body.ledgerEntries).toEqual([]);
       expect(result.body.activity).toEqual([]);
@@ -268,7 +271,10 @@ describe.each(['customers', 'suppliers'] as const)(
         expect(result.body.summary.totalPaid).toBeNull();
         expect(result.body.summary.outstanding).toBeNull();
       } else {
-        expect(Object.values(result.body.summary).every((v) => v === null)).toBe(true);
+        expect(result.body.summary.totalPurchases).toBe('345.67');
+        expect(result.body.summary.purchaseCount).toBe(4);
+        expect(result.body.summary.amountPaid).toBeNull();
+        expect(result.body.summary.amountPayable).toBeNull();
       }
       expect(delegate.findFirst.mock.calls[0]![0].where).toMatchObject({
         id,

@@ -31,6 +31,12 @@ enum StockMovementType {
   ADJUSTMENT_OUT
   INVOICE_FINALIZED
   INVOICE_CANCELLED
+  PURCHASE_BILL_FINALIZED
+  PURCHASE_BILL_CANCELLED
+  SALES_RETURN_FINALIZED
+  SALES_RETURN_CANCELLED
+  PURCHASE_RETURN_FINALIZED
+  PURCHASE_RETURN_CANCELLED
 }
 
 enum InvoiceStatus {
@@ -48,6 +54,26 @@ enum LineDiscountType {
   NONE
   PERCENT
   AMOUNT
+}
+
+enum BusinessDocumentType {
+  QUOTATION
+  SALES_ORDER
+  DELIVERY_CHALLAN
+  SALES_RETURN
+  PURCHASE_ORDER
+  PURCHASE_BILL
+  PURCHASE_RETURN
+}
+
+enum BusinessDocumentStatus {
+  DRAFT
+  ISSUED
+  ACCEPTED
+  REJECTED
+  CONFIRMED
+  FINALIZED
+  CANCELLED
 }
 
 model Category {
@@ -68,32 +94,33 @@ model Category {
 }
 
 model Product {
-  id             String          @id @default(uuid()) @db.Uuid
-  businessId     String          @db.Uuid
-  business       Business        @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  productCode    String          @db.VarChar(20)
+  id             String                 @id @default(uuid()) @db.Uuid
+  businessId     String                 @db.Uuid
+  business       Business               @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  productCode    String                 @db.VarChar(20)
   type           ItemType
-  name           String          @db.VarChar(160)
-  description    String?         @db.VarChar(2000)
-  categoryId     String?         @db.Uuid
-  category       Category?       @relation(fields: [categoryId, businessId], references: [id, businessId], onDelete: Restrict)
-  sku            String?         @db.VarChar(80)
-  barcode        String?         @db.VarChar(100)
-  hsnSacCode     String?         @db.VarChar(8)
-  gstRate        Decimal         @default(0) @db.Decimal(5, 2)
+  name           String                 @db.VarChar(160)
+  description    String?                @db.VarChar(2000)
+  categoryId     String?                @db.Uuid
+  category       Category?              @relation(fields: [categoryId, businessId], references: [id, businessId], onDelete: Restrict)
+  sku            String?                @db.VarChar(80)
+  barcode        String?                @db.VarChar(100)
+  hsnSacCode     String?                @db.VarChar(8)
+  gstRate        Decimal                @default(0) @db.Decimal(5, 2)
   unit           ItemUnit
-  purchasePrice  Decimal         @default(0) @db.Decimal(15, 2)
-  salePrice      Decimal         @default(0) @db.Decimal(15, 2)
-  mrp            Decimal?        @db.Decimal(15, 2)
-  trackInventory Boolean         @default(false)
-  openingStock   Decimal         @default(0) @db.Decimal(18, 3)
-  currentStock   Decimal         @default(0) @db.Decimal(18, 3)
-  minimumStock   Decimal?        @db.Decimal(18, 3)
-  isActive       Boolean         @default(true)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  purchasePrice  Decimal                @default(0) @db.Decimal(15, 2)
+  salePrice      Decimal                @default(0) @db.Decimal(15, 2)
+  mrp            Decimal?               @db.Decimal(15, 2)
+  trackInventory Boolean                @default(false)
+  openingStock   Decimal                @default(0) @db.Decimal(18, 3)
+  currentStock   Decimal                @default(0) @db.Decimal(18, 3)
+  minimumStock   Decimal?               @db.Decimal(18, 3)
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
   movements      StockMovement[]
   invoiceLines   InvoiceLine[]
+  documentLines  BusinessDocumentLine[]
 
   @@unique([id, businessId])
   @@unique([businessId, productCode])
@@ -120,9 +147,12 @@ model StockMovement {
   createdAt   DateTime          @default(now())
   invoiceId   String?           @db.Uuid
   invoice     Invoice?          @relation(fields: [invoiceId, businessId], references: [id, businessId], onDelete: Restrict)
+  documentId  String?           @db.Uuid
+  document    BusinessDocument? @relation(fields: [documentId, businessId], references: [id, businessId], onDelete: Restrict)
 
   @@index([businessId, productId, createdAt])
   @@index([businessId, invoiceId])
+  @@index([businessId, documentId])
   @@index([createdById])
 }
 
@@ -137,42 +167,43 @@ enum BalanceDirection {
 }
 
 model Customer {
-  id                    String           @id @default(uuid()) @db.Uuid
-  businessId            String           @db.Uuid
-  business              Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  displayName           String           @db.VarChar(160)
-  businessName          String?          @db.VarChar(160)
-  contactPerson         String?          @db.VarChar(160)
-  gstRegistered         Boolean          @default(false)
-  gstin                 String?          @db.VarChar(15)
-  pan                   String?          @db.VarChar(10)
-  phone                 String           @db.VarChar(16)
-  whatsappNumber        String?          @db.VarChar(16)
-  email                 String?          @db.VarChar(254)
-  addressLine1          String           @db.VarChar(200)
-  addressLine2          String?          @db.VarChar(200)
-  city                  String           @db.VarChar(80)
-  state                 String           @db.VarChar(80)
-  stateCode             String           @db.Char(2)
-  pincode               String           @db.Char(6)
-  openingBalance        Decimal          @default(0) @db.Decimal(15, 2)
+  id                    String             @id @default(uuid()) @db.Uuid
+  businessId            String             @db.Uuid
+  business              Business           @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  displayName           String             @db.VarChar(160)
+  businessName          String?            @db.VarChar(160)
+  contactPerson         String?            @db.VarChar(160)
+  gstRegistered         Boolean            @default(false)
+  gstin                 String?            @db.VarChar(15)
+  pan                   String?            @db.VarChar(10)
+  phone                 String             @db.VarChar(16)
+  whatsappNumber        String?            @db.VarChar(16)
+  email                 String?            @db.VarChar(254)
+  addressLine1          String             @db.VarChar(200)
+  addressLine2          String?            @db.VarChar(200)
+  city                  String             @db.VarChar(80)
+  state                 String             @db.VarChar(80)
+  stateCode             String             @db.Char(2)
+  pincode               String             @db.Char(6)
+  openingBalance        Decimal            @default(0) @db.Decimal(15, 2)
   openingBalanceType    BalanceDirection
-  paymentTermsDays      Int              @default(0)
-  notes                 String?          @db.VarChar(2000)
-  isActive              Boolean          @default(true)
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-  customerCode          String           @db.VarChar(20)
-  customerType          CustomerType     @default(INDIVIDUAL)
-  shippingSameAsBilling Boolean          @default(true)
-  shippingAddressLine1  String?          @db.VarChar(200)
-  shippingAddressLine2  String?          @db.VarChar(200)
-  shippingCity          String?          @db.VarChar(80)
-  shippingState         String?          @db.VarChar(80)
-  shippingStateCode     String?          @db.Char(2)
-  shippingPincode       String?          @db.Char(6)
-  creditLimit           Decimal?         @db.Decimal(15, 2)
+  paymentTermsDays      Int                @default(0)
+  notes                 String?            @db.VarChar(2000)
+  isActive              Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  customerCode          String             @db.VarChar(20)
+  customerType          CustomerType       @default(INDIVIDUAL)
+  shippingSameAsBilling Boolean            @default(true)
+  shippingAddressLine1  String?            @db.VarChar(200)
+  shippingAddressLine2  String?            @db.VarChar(200)
+  shippingCity          String?            @db.VarChar(80)
+  shippingState         String?            @db.VarChar(80)
+  shippingStateCode     String?            @db.Char(2)
+  shippingPincode       String?            @db.Char(6)
+  creditLimit           Decimal?           @db.Decimal(15, 2)
   invoices              Invoice[]
+  businessDocuments     BusinessDocument[]
 
   @@unique([id, businessId])
   @@unique([businessId, customerCode])
@@ -182,38 +213,40 @@ model Customer {
 }
 
 model Supplier {
-  id                 String           @id @default(uuid()) @db.Uuid
-  businessId         String           @db.Uuid
-  business           Business         @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  displayName        String           @db.VarChar(160)
-  businessName       String?          @db.VarChar(160)
-  contactPerson      String?          @db.VarChar(160)
-  gstRegistered      Boolean          @default(false)
-  gstin              String?          @db.VarChar(15)
-  pan                String?          @db.VarChar(10)
-  phone              String           @db.VarChar(16)
-  whatsappNumber     String?          @db.VarChar(16)
-  email              String?          @db.VarChar(254)
-  addressLine1       String           @db.VarChar(200)
-  addressLine2       String?          @db.VarChar(200)
-  city               String           @db.VarChar(80)
-  state              String           @db.VarChar(80)
-  stateCode          String           @db.Char(2)
-  pincode            String           @db.Char(6)
-  openingBalance     Decimal          @default(0) @db.Decimal(15, 2)
+  id                 String             @id @default(uuid()) @db.Uuid
+  businessId         String             @db.Uuid
+  business           Business           @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  displayName        String             @db.VarChar(160)
+  businessName       String?            @db.VarChar(160)
+  contactPerson      String?            @db.VarChar(160)
+  gstRegistered      Boolean            @default(false)
+  gstin              String?            @db.VarChar(15)
+  pan                String?            @db.VarChar(10)
+  phone              String             @db.VarChar(16)
+  whatsappNumber     String?            @db.VarChar(16)
+  email              String?            @db.VarChar(254)
+  addressLine1       String             @db.VarChar(200)
+  addressLine2       String?            @db.VarChar(200)
+  city               String             @db.VarChar(80)
+  state              String             @db.VarChar(80)
+  stateCode          String             @db.Char(2)
+  pincode            String             @db.Char(6)
+  openingBalance     Decimal            @default(0) @db.Decimal(15, 2)
   openingBalanceType BalanceDirection
-  paymentTermsDays   Int              @default(0)
-  notes              String?          @db.VarChar(2000)
-  isActive           Boolean          @default(true)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  supplierCode       String           @db.VarChar(20)
-  bankName           String?          @db.VarChar(120)
-  accountHolderName  String?          @db.VarChar(160)
-  accountNumber      String?          @db.VarChar(34)
-  ifsc               String?          @db.Char(11)
-  upiId              String?          @db.VarChar(100)
+  paymentTermsDays   Int                @default(0)
+  notes              String?            @db.VarChar(2000)
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  supplierCode       String             @db.VarChar(20)
+  bankName           String?            @db.VarChar(120)
+  accountHolderName  String?            @db.VarChar(160)
+  accountNumber      String?            @db.VarChar(34)
+  ifsc               String?            @db.Char(11)
+  upiId              String?            @db.VarChar(100)
+  businessDocuments  BusinessDocument[]
 
+  @@unique([id, businessId])
   @@unique([businessId, supplierCode])
   @@unique([businessId, gstin])
   @@index([businessId, isActive, createdAt])
@@ -333,41 +366,43 @@ model Business {
   stockMovements        StockMovement[]
   invoices              Invoice[]
   invoiceSequences      InvoiceSequence[]
-  nextProductNumber     Int               @default(0)
+  businessDocuments     BusinessDocument[]
+  documentSequences     BusinessDocumentSequence[]
+  nextProductNumber     Int                        @default(0)
   customers             Customer[]
   suppliers             Supplier[]
-  nextCustomerNumber    Int               @default(0)
-  nextSupplierNumber    Int               @default(0)
-  id                    String            @id @default(uuid()) @db.Uuid
-  name                  String            @db.VarChar(160)
-  tradeName             String?           @db.VarChar(160)
-  ownerName             String            @db.VarChar(160)
+  nextCustomerNumber    Int                        @default(0)
+  nextSupplierNumber    Int                        @default(0)
+  id                    String                     @id @default(uuid()) @db.Uuid
+  name                  String                     @db.VarChar(160)
+  tradeName             String?                    @db.VarChar(160)
+  ownerName             String                     @db.VarChar(160)
   businessType          BusinessType
   gstRegistered         Boolean
-  gstin                 String?           @unique @db.VarChar(15)
-  pan                   String?           @db.VarChar(10)
-  mobile                String            @db.VarChar(16)
-  email                 String            @db.VarChar(254)
-  addressLine1          String            @db.VarChar(200)
-  addressLine2          String?           @db.VarChar(200)
-  state                 String            @db.VarChar(80)
-  stateCode             String            @db.Char(2)
-  city                  String            @db.VarChar(80)
-  pincode               String            @db.Char(6)
-  logoReference         String?           @db.VarChar(250)
-  invoicePrefix         String            @db.VarChar(12)
-  financialYear         String            @db.Char(7)
+  gstin                 String?                    @unique @db.VarChar(15)
+  pan                   String?                    @db.VarChar(10)
+  mobile                String                     @db.VarChar(16)
+  email                 String                     @db.VarChar(254)
+  addressLine1          String                     @db.VarChar(200)
+  addressLine2          String?                    @db.VarChar(200)
+  state                 String                     @db.VarChar(80)
+  stateCode             String                     @db.Char(2)
+  city                  String                     @db.VarChar(80)
+  pincode               String                     @db.Char(6)
+  logoReference         String?                    @db.VarChar(250)
+  invoicePrefix         String                     @db.VarChar(12)
+  financialYear         String                     @db.Char(7)
   gstMode               GstMode
-  bankName              String?           @db.VarChar(120)
-  accountHolder         String?           @db.VarChar(160)
-  accountNumber         String?           @db.VarChar(34)
-  ifsc                  String?           @db.Char(11)
-  upiId                 String?           @db.VarChar(100)
+  bankName              String?                    @db.VarChar(120)
+  accountHolder         String?                    @db.VarChar(160)
+  accountNumber         String?                    @db.VarChar(34)
+  ifsc                  String?                    @db.Char(11)
+  upiId                 String?                    @db.VarChar(100)
   onboardingCompletedAt DateTime
   memberships           BusinessMember[]
-  currentUsers          User[]            @relation("CurrentBusiness")
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  currentUsers          User[]                     @relation("CurrentBusiness")
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 }
 
 model InvoiceSequence {
@@ -513,4 +548,131 @@ model BusinessMember {
 
   @@unique([userId, businessId])
   @@index([businessId, role])
+}
+
+model BusinessDocumentSequence {
+  id            String               @id @default(uuid()) @db.Uuid
+  businessId    String               @db.Uuid
+  business      Business             @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  documentType  BusinessDocumentType
+  financialYear String               @db.Char(7)
+  nextNumber    Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([businessId, documentType, financialYear])
+}
+
+model BusinessDocument {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  businessId             String                 @db.Uuid
+  business               Business               @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  documentType           BusinessDocumentType
+  status                 BusinessDocumentStatus @default(DRAFT)
+  documentNumber         String?                @db.VarChar(40)
+  sequenceNumber         Int?
+  financialYear          String                 @db.Char(7)
+  documentDate           DateTime               @db.Date
+  dueDate                DateTime?              @db.Date
+  validUntil             DateTime?              @db.Date
+  partyKind              String                 @db.VarChar(10)
+  customerId             String?                @db.Uuid
+  customer               Customer?              @relation(fields: [customerId, businessId], references: [id, businessId], onDelete: Restrict)
+  supplierId             String?                @db.Uuid
+  supplier               Supplier?              @relation(fields: [supplierId, businessId], references: [id, businessId], onDelete: Restrict)
+  sourceInvoiceId        String?                @db.Uuid
+  sourceDocumentId       String?                @db.Uuid
+  supplierInvoiceNumber  String?                @db.VarChar(80)
+  placeOfSupplyState     String                 @db.VarChar(80)
+  placeOfSupplyStateCode String                 @db.Char(2)
+  gstApplicable          Boolean                @default(false)
+  priceMode              InvoicePriceMode       @default(EXCLUSIVE)
+  reason                 String?                @db.VarChar(500)
+  notes                  String?                @db.VarChar(2000)
+  terms                  String?                @db.VarChar(2000)
+  businessNameSnapshot   String                 @db.VarChar(160)
+  businessGstinSnapshot  String?                @db.VarChar(15)
+  businessAddressLine1   String                 @db.VarChar(200)
+  businessCity           String                 @db.VarChar(80)
+  businessState          String                 @db.VarChar(80)
+  businessStateCode      String                 @db.Char(2)
+  businessPincode        String                 @db.VarChar(6)
+  partyCodeSnapshot      String?                @db.VarChar(20)
+  partyNameSnapshot      String                 @db.VarChar(160)
+  partyBusinessName      String?                @db.VarChar(160)
+  partyGstinSnapshot     String?                @db.VarChar(15)
+  partyPanSnapshot       String?                @db.VarChar(10)
+  partyPhoneSnapshot     String?                @db.VarChar(16)
+  partyEmailSnapshot     String?                @db.VarChar(254)
+  partyAddressLine1      String                 @db.VarChar(200)
+  partyCity              String                 @db.VarChar(80)
+  partyState             String                 @db.VarChar(80)
+  partyStateCode         String                 @db.Char(2)
+  partyPincode           String                 @db.VarChar(6)
+  subtotal               Decimal                @default(0) @db.Decimal(15, 2)
+  discountTotal          Decimal                @default(0) @db.Decimal(15, 2)
+  taxableTotal           Decimal                @default(0) @db.Decimal(15, 2)
+  cgstTotal              Decimal                @default(0) @db.Decimal(15, 2)
+  sgstTotal              Decimal                @default(0) @db.Decimal(15, 2)
+  igstTotal              Decimal                @default(0) @db.Decimal(15, 2)
+  taxTotal               Decimal                @default(0) @db.Decimal(15, 2)
+  roundOff               Decimal                @default(0) @db.Decimal(15, 2)
+  grandTotal             Decimal                @default(0) @db.Decimal(15, 2)
+  actedAt                DateTime?
+  actedById              String?                @db.Uuid
+  cancelledAt            DateTime?
+  cancelledById          String?                @db.Uuid
+  cancellationReason     String?                @db.VarChar(500)
+  createdById            String                 @db.Uuid
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  lines                  BusinessDocumentLine[]
+  stockMovements         StockMovement[]
+
+  @@unique([id, businessId])
+  @@unique([businessId, documentNumber])
+  @@unique([businessId, supplierId, supplierInvoiceNumber])
+  @@index([businessId, documentType, status, documentDate])
+  @@index([businessId, customerId])
+  @@index([businessId, supplierId])
+  @@index([businessId, sourceInvoiceId])
+  @@index([businessId, sourceDocumentId])
+}
+
+model BusinessDocumentLine {
+  id                   String           @id @default(uuid()) @db.Uuid
+  documentId           String           @db.Uuid
+  businessId           String           @db.Uuid
+  document             BusinessDocument @relation(fields: [documentId, businessId], references: [id, businessId], onDelete: Cascade)
+  productId            String?          @db.Uuid
+  product              Product?         @relation(fields: [productId, businessId], references: [id, businessId], onDelete: Restrict)
+  sourceInvoiceLineId  String?          @db.Uuid
+  sourceDocumentLineId String?          @db.Uuid
+  lineNumber           Int
+  productCodeSnapshot  String?          @db.VarChar(20)
+  productNameSnapshot  String           @db.VarChar(160)
+  productTypeSnapshot  ItemType
+  hsnSacCodeSnapshot   String?          @db.VarChar(8)
+  unitSnapshot         ItemUnit
+  quantity             Decimal          @db.Decimal(18, 3)
+  unitPrice            Decimal          @db.Decimal(15, 2)
+  priceMode            InvoicePriceMode
+  discountType         LineDiscountType @default(NONE)
+  discountValue        Decimal          @default(0) @db.Decimal(15, 2)
+  discountAmount       Decimal          @default(0) @db.Decimal(15, 2)
+  grossAmount          Decimal          @default(0) @db.Decimal(15, 2)
+  taxableAmount        Decimal          @default(0) @db.Decimal(15, 2)
+  gstRate              Decimal          @default(0) @db.Decimal(5, 2)
+  cgstRate             Decimal          @default(0) @db.Decimal(5, 2)
+  cgstAmount           Decimal          @default(0) @db.Decimal(15, 2)
+  sgstRate             Decimal          @default(0) @db.Decimal(5, 2)
+  sgstAmount           Decimal          @default(0) @db.Decimal(15, 2)
+  igstRate             Decimal          @default(0) @db.Decimal(5, 2)
+  igstAmount           Decimal          @default(0) @db.Decimal(15, 2)
+  taxAmount            Decimal          @default(0) @db.Decimal(15, 2)
+  lineTotal            Decimal          @default(0) @db.Decimal(15, 2)
+
+  @@index([businessId, productId])
+  @@index([businessId, sourceInvoiceLineId])
+  @@index([businessId, sourceDocumentLineId])
 }

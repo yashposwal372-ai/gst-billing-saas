@@ -17,7 +17,7 @@ function containDialogFocus(event: ReactKeyboardEvent<HTMLDialogElement>) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 }
 
-const destinations: Record<string,string> = {Invoices:"/invoices",Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory"};
+const destinations: Record<string,string> = {Invoices:"/invoices",Quotations:"/quotations","Sales Orders":"/sales-orders","Delivery Challans":"/delivery-challans",Returns:"/sales-returns","Purchase Bills":"/purchase-bills","Purchase Orders":"/purchase-orders","Purchase Returns":"/purchase-returns",Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory"};
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();

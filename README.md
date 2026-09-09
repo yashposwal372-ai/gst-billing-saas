@@ -1,6 +1,6 @@
 # GST Billing & Business Management SaaS
 
-Phase 6 adds sales invoice drafts, server-authoritative GST calculation, finalization/cancellation lifecycle, invoice print views and stock integration to the existing authentication, onboarding, dashboard, party and catalogue management. Later sales/purchase/payment/reporting modules remain future work. Live PostgreSQL/Redis verification is outstanding.
+Phase 7 adds sales and purchase document management on top of the existing authentication, onboarding, dashboard, party, catalogue and GST invoice foundation. Payments, accounting, statutory GST returns, e-invoice/e-way bill, portals, staff, AI, subscriptions and administration remain future work. Live PostgreSQL/Redis verification is outstanding.
 
 ## Architecture
 
@@ -179,6 +179,23 @@ Migration `20260908210000_phase6_gst_billing_invoices` was generated offline aga
 
 Validation: lint, typecheck and build passed. API unit tests: 153 passed. HTTP/e2e tests: 188 passed; 6 real PostgreSQL opt-in tests skipped without `TEST_DATABASE_URL`. Tests cover calculator GST/rounding/financial-year behavior, invoice HTTP preview/create/update/discard/finalize/cancel flows with database doubles, and opt-in PostgreSQL invoice transaction coverage for concurrent finalize/cancel stock behavior. Fixture-backed invoice browser smoke checks passed for list, form, detail, edit and print routes at 1440/1024/768/375px, including stale preview response protection, finalize/cancel dialogs and cancelled print watermark/status. Browser checks use intercepted test API fixtures, so they do not prove live auth or persistence.
 
+## Phase 7 sales and purchases (2026-09-09)
+
+Frontend routes now include `/quotations`, `/sales-orders`, `/delivery-challans`, `/sales-returns`, `/purchase-orders`, `/purchase-bills`, and `/purchase-returns`, each with list, new, detail, edit and print pages. Sales and Purchases navigation is enabled for these documents, and Record purchase links to `/purchase-bills/new`. Existing invoices remain the Phase 6 invoice implementation.
+
+Phase 7 documents use a generalized `BusinessDocument` / `BusinessDocumentLine` schema with `BusinessDocumentType`, `BusinessDocumentStatus` and `BusinessDocumentSequence`. This stores quotations, sales orders, delivery challans, sales returns, purchase orders, purchase bills and purchase returns as business-scoped document records rather than seven separate tables. Document numbers are assigned only on issue/confirm/finalize actions using prefixes `QT`, `SO`, `DC`, `SR`, `PO`, `PB`, and `PR` with the April-March financial year, for example `PB/2026-27/000001`. Drafts remain unnumbered.
+
+All document APIs are under `/api/v1` and require the authenticated user's current OWNER business plus existing Origin/CSRF protections. Each resource exposes GET/POST collection, POST `/preview`, GET/PATCH/DELETE `/:id`, POST lifecycle actions and POST `/:id/convert/:target`. Implemented conversions are quotation to sales order, sales order to delivery challan, purchase order to purchase bill, quotation to invoice draft, sales order to invoice draft, and delivery challan to invoice draft. Invoice draft conversions create a new unnumbered Phase 6 invoice draft through the invoice service; the source document remains unchanged and stock is not affected until invoice finalization.
+
+Server-side GST calculation reuses the Phase 6 Decimal calculator with two-place currency rounding and three-place quantities. EXCLUSIVE and INCLUSIVE pricing, line discounts, CGST/SGST/IGST split and place-of-supply handling are server-authoritative. Client totals are rejected by DTO whitelisting. These remain deterministic commercial calculations, not official GST registration verification, ITC eligibility, credit/debit notes, GSTR reporting, IRN, QR or e-way bill support.
+
+Quotations, sales orders, delivery challans and purchase orders do not affect stock. Purchase bill finalization increases tracked product stock; purchase bill cancellation reverses that increase only if stock will not go negative. Sales return finalization restores tracked product stock against finalized invoices and cancellation reverses it. Purchase return finalization deducts tracked product stock against finalized purchase bills and cancellation restores it. Duplicate return lines are aggregated against the source line so over-return cannot slip through split lines. Service returns are rejected in Phase 7; service lines in commercial documents never create stock movements.
+
+Seller, customer, supplier and product details are snapshotted into document rows and lines, so issued/finalized/cancelled print/detail views use stored historical values. Purchase bill totals feed the dashboard purchase metric where available. Supplier detail now reports finalized purchase bill count and total purchases; paid/payable settlement remains unavailable until payments/accounting phases.
+
+Migration `20260909120000_phase7_sales_purchases` was generated offline and inspected. It adds business document enums, sequence/table/line records, scoped indexes/foreign keys, supplier composite tenant key, and document-linked stock movement types. **Migration application: NOT RUN.** Use the existing deploy command only against a configured PostgreSQL database when available; never reset for validation.
+
+Validation in this environment: API Phase 7 HTTP double coverage was added for preview/create/lifecycle/conversion/stock/return safety. Root lint, typecheck, build, API unit, API HTTP/e2e, Prisma format/validate/generate and git diff checks passed. Fixture-backed Phase 7 browser smoke passed outside the sandbox at 1440/1024/768/375 for document routes, conversions, lifecycle dialogs, responsive layout and print DOM checks. npm audit remained blocked by automatic approval review after a read-only registry attempt; manual user approval is required. Local PostgreSQL and Redis remain unavailable, so live persistence/concurrency/cache verification is not claimed.
 ## Infrastructure and dependency limitations
 
 Phase 1 previously verified root dev serving on ports 3000 and 4000; watch restart was not verified. Phase 2 runtime checks used compiled servers.
