@@ -129,6 +129,17 @@ export class AdjustmentDto {
 }
 export class MovementQuery extends PageQuery {
   @ValidateIf(optional)
-  @IsIn(['OPENING', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT'])
-  type?: 'OPENING' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT';
+  @IsIn([
+    'OPENING',
+    'ADJUSTMENT_IN',
+    'ADJUSTMENT_OUT',
+    'INVOICE_FINALIZED',
+    'INVOICE_CANCELLED',
+  ])
+  type?:
+    | 'OPENING'
+    | 'ADJUSTMENT_IN'
+    | 'ADJUSTMENT_OUT'
+    | 'INVOICE_FINALIZED'
+    | 'INVOICE_CANCELLED';
 }

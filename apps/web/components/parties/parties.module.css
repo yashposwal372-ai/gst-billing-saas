@@ -344,3 +344,16 @@
     grid-template-columns: 85px minmax(0, 1fr);
   }
 }
+.grid label,
+.filters label {
+  min-width: 0;
+}
+.grid input,
+.grid select,
+.grid textarea,
+.filters input,
+.filters select,
+.dialog textarea {
+  max-width: 100%;
+  min-width: 0;
+}

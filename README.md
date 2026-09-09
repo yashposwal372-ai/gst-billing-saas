@@ -1,6 +1,6 @@
 # GST Billing & Business Management SaaS
 
-Phase 5 adds a unified product/service catalogue, categories and stock adjustments to the existing authentication, onboarding, dashboard and party management. Financial modules remain future work. Live PostgreSQL/Redis verification is outstanding.
+Phase 6 adds sales invoice drafts, server-authoritative GST calculation, finalization/cancellation lifecycle, invoice print views and stock integration to the existing authentication, onboarding, dashboard, party and catalogue management. Later sales/purchase/payment/reporting modules remain future work. Live PostgreSQL/Redis verification is outstanding.
 
 ## Architecture
 
@@ -151,6 +151,34 @@ Run `node apps/web/scripts/dashboard-smoke.mjs --catalogue` after building with 
 
 Known UI limits: category selectors load the first 100 categories; unsaved-change protection covers reload/close and Cancel, not all in-app links. No barcode scanning/printing UI, stock valuation, unit conversion or financial transactions are implemented.
 
+## Phase 6 GST billing and invoices (2026-09-08)
+
+Frontend routes: `/invoices`, `/invoices/new`, `/invoices/:id`, `/invoices/:id/edit`, and `/invoices/:id/print`. Sales > Invoices and the Create invoice dashboard action are enabled. The print route is browser print-to-PDF using print CSS; no server-generated PDF, IRN, government QR, e-invoice registration, e-way bill, GST portal integration or GST return filing exists.
+
+All invoice API paths are under `/api/v1`, require the authenticated user's current OWNER business, and keep the existing Origin/CSRF protections on writes. Unknown DTO/query fields are rejected, including client-submitted totals.
+
+| Methods | Path | Behavior |
+| --- | --- | --- |
+| GET, POST | `/invoices` | Paginated list / create draft |
+| POST | `/invoices/preview` | Server-calculated draft preview without persistence |
+| GET, PATCH, DELETE | `/invoices/:id` | Detail / edit draft / discard draft |
+| POST | `/invoices/:id/finalize` | Assign permanent invoice number and deduct stock |
+| POST | `/invoices/:id/cancel` | Cancel finalized invoice and restore stock |
+
+Draft invoices have no permanent invoice number and do not affect stock. Finalization assigns a server-generated number such as `INV/2026-27/000001`, using the existing business invoice prefix, an `InvoiceSequence` row scoped by business and Indian-style April-March financial year, and a Serializable transaction. Finalized invoice financial fields and snapshots are immutable through the public API. Cancellation preserves the invoice number and totals, records reason/date/actor and restores stock exactly once.
+
+Invoice, InvoiceLine and InvoiceSequence store seller/customer/product snapshots, line values and computed totals. Seller data comes from the authorized Business; selected Customer and Product records are loaded by the backend and snapshotted. Historical finalized/cancelled invoice rendering uses invoice snapshots, not today's mutable customer/product/business records.
+
+The authoritative calculator lives in `apps/api/src/invoices/invoice-calculator.ts`. It uses Prisma Decimal arithmetic, currency rounding to two places and Phase 5 quantity precision to three places. Supported price modes are EXCLUSIVE and INCLUSIVE. Supported discounts are line-level NONE, PERCENT and AMOUNT. Product GST rate is snapshotted; client-submitted tax amounts and totals are not trusted. Place of supply is validated, and tax treatment is determined by seller state code versus place-of-supply state code: same state produces CGST/SGST, different state produces IGST, and zero GST produces zero components. These are deterministic calculation and format checks only, not official GST classification, portal validation or tax compliance certification.
+
+Finalization aggregates duplicate product lines before stock deduction so repeated lines cannot oversell independently. Inventory products are deducted transactionally with `INVOICE_FINALIZED` stock movements; cancellation restores them with `INVOICE_CANCELLED` movements. Services and untracked products do not create stock movements. Negative resulting stock is rejected. Real PostgreSQL concurrency and rollback remain unverified locally.
+
+Dashboard sales metrics now use finalized, non-cancelled invoices where the implemented query can aggregate them truthfully; cancelled and draft invoices are excluded. Customer detail exposes finalized invoice count and total sales only. Payments, paid amounts, receivables, overdue invoices, purchases, GST reports and ledgers remain unavailable.
+
+Migration `20260908210000_phase6_gst_billing_invoices` was generated offline against the Phase 5 schema and inspected. It adds invoice enums, InvoiceSequence, Invoice, InvoiceLine, invoice-linked stock movements, composite tenant FKs/indexes and the new stock movement types. **Migration application: NOT RUN.** Use the existing deploy command only against a configured PostgreSQL database when available; no reset is needed.
+
+Validation: lint, typecheck and build passed. API unit tests: 153 passed. HTTP/e2e tests: 188 passed; 6 real PostgreSQL opt-in tests skipped without `TEST_DATABASE_URL`. Tests cover calculator GST/rounding/financial-year behavior, invoice HTTP preview/create/update/discard/finalize/cancel flows with database doubles, and opt-in PostgreSQL invoice transaction coverage for concurrent finalize/cancel stock behavior. Fixture-backed invoice browser smoke checks passed for list, form, detail, edit and print routes at 1440/1024/768/375px, including stale preview response protection, finalize/cancel dialogs and cancelled print watermark/status. Browser checks use intercepted test API fixtures, so they do not prove live auth or persistence.
+
 ## Infrastructure and dependency limitations
 
 Phase 1 previously verified root dev serving on ports 3000 and 4000; watch restart was not verified. Phase 2 runtime checks used compiled servers.
@@ -161,4 +189,4 @@ npm audit reports 9 packages: 2 low, 1 moderate, 6 high. Production-only audit r
 
 npm also warns of unapproved dependency lifecycle scripts for Prisma, its engines, and optional msgpackr-extract. Generation/build/tests work in this environment; no blanket script approval was added. Vitest reports the existing vite-tsconfig-paths native-support warning.
 
-Phase 5 implementation and feasible validation are complete with the runtime limitations above. Phase 6 (GST Billing + Invoice Generation) has not started and requires separate authorization.
+Phase 6 implementation and feasible validation are complete with the runtime limitations above. Phase 7 (Sales + Purchases) has not started and requires separate authorization.

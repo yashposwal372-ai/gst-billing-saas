@@ -8,12 +8,13 @@ export const periods = [
 ] as const;
 export type DashboardFilter = { period: (typeof periods)[number][0]; start?: string; end?: string };
 const unavailable = z.null();
+const money = z.string().regex(/^\d+(\.\d{2})$/).nullable();
 const empty = z.array(z.never());
 export const dashboardSchema = z.object({
   business: z.object({ id: z.string(), name: z.string(), role: z.literal("OWNER"), onboardingCompleted: z.boolean() }).nullable(),
   dataStatus: z.literal("not_available"),
   filter: z.object({ period: z.string(), start: z.string().nullable(), end: z.string().nullable(), timezone: z.literal("Asia/Kolkata") }),
-  metrics: z.object({ todaySales: unavailable, monthlySales: unavailable, totalSales: unavailable,
+  metrics: z.object({ todaySales: money, monthlySales: money, totalSales: unavailable,
     totalPurchases: unavailable, totalExpenses: unavailable, totalGst: unavailable, receivables: unavailable,
     customers: z.number().int().nonnegative().nullable(), suppliers: z.number().int().nonnegative().nullable(), products: z.number().int().nonnegative().nullable(), lowStock: z.number().int().nonnegative().nullable(), overdueInvoices: unavailable }),
   recentActivity: empty,

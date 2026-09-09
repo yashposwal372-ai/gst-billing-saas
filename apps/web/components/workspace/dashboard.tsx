@@ -8,8 +8,8 @@ import { Icon, type IconName } from "./icon";
 import styles from "./workspace.module.css";
 
 const metrics: { label: string; icon: IconName; note: string }[] = [
-  { label: "Today’s sales", icon: "chart", note: "Sales insights coming soon" },
-  { label: "Monthly sales", icon: "calendar", note: "Your month at a glance" },
+  { label: "Today’s sales", icon: "chart", note: "Finalized invoice sales" },
+  { label: "Monthly sales", icon: "calendar", note: "Finalized invoice sales" },
   { label: "GST collected", icon: "receipt", note: "Tax insights coming soon" },
   { label: "Outstanding receivables", icon: "wallet", note: "Payments insights coming soon" },
   { label: "Active customers", icon: "people", note: "Current active customer records" },
@@ -65,12 +65,12 @@ export function Dashboard() {
   const selectedPeriod = periods.find(([key]) => key === summary.filter.period)?.[1] ?? "Selected period";
   return <>
     <div className={styles.pageHeading}><div><p className={styles.eyebrow}>YOUR BUSINESS AT A GLANCE</p><h1>Welcome back, {user.firstName}.</h1><p>Here’s the overview for <strong>{summary.business?.name}</strong>.</p></div><DateFilter /></div>
-    <section className={styles.setupBanner}><span className={styles.bannerIcon}><Icon name="check" /></span><div><strong>A strong start for your business</strong><p>Your profile is ready. Manage your catalogue and stock. Sales and financial insights are coming soon.</p></div><Link href="/onboarding">Review profile<Icon name="arrow" /></Link></section>
-    <section className={styles.quickActions} aria-label="Quick actions"><span>Quick actions</span>{quickActions.map((action) => action.label === "Add customer" || action.label === "Add product" ? <Link key={action.label} href={action.label === "Add customer" ? "/customers/new" : "/products/new"}><Icon name={action.icon} /><span>{action.label}</span></Link> : <button disabled key={action.label}><Icon name={action.icon} /><span>{action.label}</span><small>Soon</small></button>)}</section>
+    <section className={styles.setupBanner}><span className={styles.bannerIcon}><Icon name="check" /></span><div><strong>A strong start for your business</strong><p>Your profile is ready. Manage your catalogue, stock and sales invoices.</p></div><Link href="/onboarding">Review profile<Icon name="arrow" /></Link></section>
+    <section className={styles.quickActions} aria-label="Quick actions"><span>Quick actions</span>{quickActions.map((action) => action.label === "Create invoice" || action.label === "Add customer" || action.label === "Add product" ? <Link key={action.label} href={action.label === "Create invoice" ? "/invoices/new" : action.label === "Add customer" ? "/customers/new" : "/products/new"}><Icon name={action.icon} /><span>{action.label}</span></Link> : <button disabled key={action.label}><Icon name={action.icon} /><span>{action.label}</span><small>Soon</small></button>)}</section>
     {loading ? <DashboardSkeleton /> : <div aria-live="polite" aria-atomic="false">
       <div className={styles.sectionLabel}><h2>Business overview</h2><span>{selectedPeriod} · INR · India time</span></div>
       <div className={styles.kpiGrid}>{metrics.map((metric) => <section key={metric.label} className={styles.kpiCard}>
-        <div><h3>{metric.label}</h3><Icon name={metric.icon} /></div><p className={styles.metricValue}>{metric.label === "Active customers" ? summary.metrics.customers ?? "—" : metric.label === "Active suppliers" ? summary.metrics.suppliers ?? "—" : metric.label === "Total products" ? summary.metrics.products ?? "?" : metric.label === "Low stock" ? summary.metrics.lowStock ?? "?" : <span aria-label="Not available">—</span>}</p><p className={styles.metricNote}>{metric.note}</p>
+        <div><h3>{metric.label}</h3><Icon name={metric.icon} /></div><p className={styles.metricValue}>{metric.label === "Today’s sales" ? summary.metrics.todaySales ?? "—" : metric.label === "Monthly sales" ? summary.metrics.monthlySales ?? "—" : metric.label === "Active customers" ? summary.metrics.customers ?? "—" : metric.label === "Active suppliers" ? summary.metrics.suppliers ?? "—" : metric.label === "Total products" ? summary.metrics.products ?? "?" : metric.label === "Low stock" ? summary.metrics.lowStock ?? "?" : <span aria-label="Not available">—</span>}</p><p className={styles.metricNote}>{metric.note}</p>
       </section>)}</div>
       <div className={styles.chartGrid}>
         <section className={`${styles.panel} ${styles.salesPanel}`}>
@@ -83,7 +83,7 @@ export function Dashboard() {
           <div className={styles.progressLabel}><span>Workspace setup</span><strong>{1 + (summary.metrics.customers ? 1 : 0) + (summary.metrics.products ? 1 : 0)} of 4</strong></div><progress value={1 + (summary.metrics.customers ? 1 : 0) + (summary.metrics.products ? 1 : 0)} max={4} aria-label="Workspace setup progress" />
           <ol className={styles.checklist}><li><span className={styles.complete}><Icon name="check" /></span><div><strong>Set up your business</strong><small>Profile complete</small></div><Link href="/onboarding" aria-label="Review business profile"><Icon name="arrow" /></Link></li>
             <li><span>{summary.metrics.customers ? <Icon name="check" /> : 2}</span><div><strong>Add your first customer</strong><small>{summary.metrics.customers ? "Customer added" : "Ready to begin"}</small></div><Link href="/customers/new" aria-label="Add customer"><Icon name="arrow" /></Link></li>
-            <li><span>{summary.metrics.products ? <Icon name="check" /> : 3}</span><div><strong>Add your first product</strong><small>{summary.metrics.products ? "Product added" : "Ready to begin"}</small></div><Link href="/products/new" aria-label="Add product"><Icon name="arrow" /></Link></li><li><span>4</span><div><strong>Create your first invoice</strong><small>Coming soon</small></div></li></ol>
+            <li><span>{summary.metrics.products ? <Icon name="check" /> : 3}</span><div><strong>Add your first product</strong><small>{summary.metrics.products ? "Product added" : "Ready to begin"}</small></div><Link href="/products/new" aria-label="Add product"><Icon name="arrow" /></Link></li><li><span>4</span><div><strong>Create your first invoice</strong><small>Ready to begin</small></div><Link href="/invoices/new" aria-label="Create invoice"><Icon name="arrow" /></Link></li></ol>
           <p className={styles.checklistNote}>Your next chapter is on its way. We’ll make each step simple.</p>
         </section>
       </div>

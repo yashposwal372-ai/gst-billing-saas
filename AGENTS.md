@@ -2,7 +2,7 @@
 
 ## Locked product and architecture
 
-Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation, customer/supplier management and products/inventory are implemented through Phase 5. Billing, payments, accounting, reports, portals, staff, AI, subscriptions and administration remain future work.
+Build a production-oriented SaaS for Indian businesses, phase by phase. Authentication, business onboarding, dashboard/navigation, customer/supplier management, products/inventory and GST billing invoices are implemented through Phase 6. Purchases, payments, accounting, reports, portals, staff, AI, subscriptions and administration remain future work.
 
 - Frontend: Next.js + React + TypeScript + Tailwind CSS in apps/web, with Zod validation.
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
@@ -10,6 +10,25 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Redis supports cache infrastructure; BullMQ uses Redis for future background work. Avoid unnecessary distributed microservices.
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
+
+## Verified Phase 6 implementation: 2026-09-08
+
+- Started from approved clean Phase 5 checkpoint 8c6a45a7e308f7ebc266f9bc2e58301c8fa7241d. No commit, push, reset, cleanup or Phase 7 work was performed in this continuation.
+- Added InvoiceStatus DRAFT/FINALIZED/CANCELLED, InvoicePriceMode EXCLUSIVE/INCLUSIVE, LineDiscountType NONE/PERCENT/AMOUNT, InvoiceSequence, Invoice and InvoiceLine. StockMovementType now includes INVOICE_FINALIZED and INVOICE_CANCELLED, with optional invoiceId linked by composite business-scoped FK. Customer and Product invoice relations use business-scoped references; InvoiceLine uses product snapshots and composite invoice/product tenant keys.
+- Draft invoices keep invoiceNumber and sequenceNumber null and do not affect stock. PATCH/DELETE apply only to DRAFT. Finalization and cancellation use explicit POST actions; arbitrary status PATCH is not exposed. Finalized/cancelled records preserve seller/customer/product snapshots and stored totals.
+- Invoice numbering is assigned only on finalization with `Business.invoicePrefix`, derived April-March financial year and an `InvoiceSequence` unique by businessId+financialYear. Default format is `INV/2026-27/000001` for prefix INV. Sequence upsert, stock mutation and invoice status update run in a Serializable transaction with the existing bounded retry helper. Real PostgreSQL concurrency remains unverified locally.
+- Seller snapshots are populated from the authorized Business, including available name/trade name, GSTIN/PAN, address and bank/UPI fields. Customer snapshots are loaded from the selected active Customer and include code/name/business name, GSTIN/PAN, phone/email and billing/shipping address fields. Walk-in billing was not added.
+- Product line snapshots include product code/name/type, HSN/SAC, unit, quantity, unit price, price mode, discount config, product GST rate and computed amounts. Product GST rate override was not added. Product/customer/business edits after finalization do not alter stored invoice output.
+- Authoritative calculation lives in apps/api/src/invoices/invoice-calculator.ts and uses Prisma Decimal. Currency is rounded half-up to 2 decimals; quantities serialize to 3 decimals. EXCLUSIVE and INCLUSIVE pricing are both implemented. Discounts are line-level only. Place of supply is validated and tax treatment is determined from seller state code versus place-of-supply state code: same state creates CGST/SGST with deterministic reconciliation, different state creates IGST, zero GST creates zero components. These are calculation/format checks only, not government validation, classification, e-invoice, IRN, QR, e-way bill or GST filing.
+- Backend APIs under /api/v1: GET/POST /invoices, POST /invoices/preview, GET/PATCH/DELETE /invoices/:id, POST /invoices/:id/finalize, POST /invoices/:id/cancel. All require current OWNER business and preserve AuthGuard/BrowserWriteGuard, exact Origin/CSRF and unknown-field rejection. Preview is authenticated and returns server-calculated totals without persistence. Client totals are rejected by DTO whitelisting.
+- Finalization aggregates duplicate product lines before stock deduction, rejects inactive inventory products and insufficient stock, updates Product.currentStock conditionally and appends INVOICE_FINALIZED movements. Services and untracked products do not create movements. Cancellation of FINALIZED invoices appends INVOICE_CANCELLED restore movements and cannot be repeated through the API.
+- Frontend routes added: /invoices, /invoices/new, /invoices/:id, /invoices/:id/edit and /invoices/:id/print. Sales > Invoices and dashboard Create invoice are enabled; quotations/orders/purchases/returns/payments remain disabled/upcoming. The invoice builder uses server preview for totals and renders stored server values after save. Print is browser print-to-PDF with print CSS, not server-generated PDF.
+- Dashboard sales metrics and customer detail sales/count now use finalized invoice data only where implemented. Draft/cancelled invoices are excluded. Paid, receivables, overdue, purchase, ledger and GST report metrics remain unavailable. Product/low-stock dashboard behavior is preserved.
+- Prisma format/validate/generate passed. Migration 20260908210000_phase6_gst_billing_invoices was generated offline against Phase 5 and inspected: invoice enums/tables/indices/FKs and stock movement type additions only. Migration application NOT RUN; no database reset.
+- Root lint/typecheck/build passed. API unit tests: 153 passed. HTTP/e2e: 188 passed; six real PostgreSQL opt-in tests skipped across existing database suites, including the new invoice transaction suite. Added calculator unit coverage, invoice HTTP double-backed preview/create/finalize/cancel coverage and opt-in PostgreSQL tests for concurrent finalize/cancel stock behavior. HTTP doubles do not prove real PostgreSQL transactions/concurrency.
+- PostgreSQL localhost:5432 and Redis localhost:6379 were unavailable. Docker was not installed. npm audit --omit=dev reports 4 high production findings in Prisma/deepmerge-ts/mysql2 transitive chain; full npm audit reports 9 findings (2 low, 1 moderate, 6 high), same known families plus @nestjs/mau development tree. No audit fix, forced dependency change or unrelated upgrade was run.
+- Fixture-backed invoice browser smoke checks passed outside the Windows sandbox: /invoices list, new, detail, edit and print at 1440/1024/768/375px; finalize dialog keyboard containment/Escape/focus restoration; create draft; server-preview stale-response race; finalize; cancel; and cancelled print watermark/status. Screenshots were written under the Windows temp directory and inspected through the smoke assertions. These checks use test-only intercepted API fixtures and do not verify live auth or persistence. Existing Vitest vite-tsconfig-paths warning and Windows LF-to-CRLF Git notices remain.
+- Phase 7 requires explicit new authorization. Historical sections below are superseded by this section where applicable.
 
 ## Verified Phase 5 implementation: 2026-09-08
 
@@ -120,7 +139,7 @@ infra:check explicitly runs SELECT 1 through Prisma and Redis PING with nonzero 
 3. Dashboard + Navigation (implemented; runtime limitations above; stop here).
 4. Customers + Suppliers (implemented; runtime limitations above; stop here).
 5. Products + Inventory (implemented; runtime limitations above; stop here).
-6. GST Billing + Invoice Generation.
+6. GST Billing + Invoice Generation (implemented; runtime limitations above; stop here).
 7. Sales + Purchases.
 8. Payments + Expenses + Banking.
 9. GST Reports.

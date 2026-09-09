@@ -137,7 +137,7 @@ export const productSchema = z.object({
   stockStatus: z.enum(["not_tracked", "available", "low", "out"]),
 });
 export type Product = z.infer<typeof productSchema>;
-const paged = <T extends z.ZodType>(item: T) =>
+export const paged = <T extends z.ZodType>(item: T) =>
   z.object({
     items: z.array(item),
     total: z.number().int().nonnegative(),
@@ -147,7 +147,13 @@ const paged = <T extends z.ZodType>(item: T) =>
 export const movementSchema = z.object({
   id: z.string(),
   productId: z.string(),
-  type: z.enum(["OPENING", "ADJUSTMENT_IN", "ADJUSTMENT_OUT"]),
+  type: z.enum([
+    "OPENING",
+    "ADJUSTMENT_IN",
+    "ADJUSTMENT_OUT",
+    "INVOICE_FINALIZED",
+    "INVOICE_CANCELLED",
+  ]),
   quantity,
   beforeStock: quantity,
   afterStock: quantity,

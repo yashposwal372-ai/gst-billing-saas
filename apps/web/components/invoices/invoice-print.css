@@ -1,0 +1,42 @@
+@media print {
+  .noPrint,
+  aside,
+  header {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+  .invoicePrint {
+    color: #111827;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0;
+    padding: 12mm;
+  }
+  .invoicePrint section,
+  .invoicePrint table {
+    break-inside: avoid;
+  }
+}
+.invoicePrint {
+  position: relative;
+}
+.invoiceCancelledWatermark {
+  border: 2px solid #b91c1c;
+  color: #b91c1c;
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  margin-bottom: 1rem;
+  padding: 0.35rem 0.75rem;
+  text-transform: uppercase;
+}
+@media print {
+  .invoiceCancelledWatermark {
+    position: absolute;
+    right: 16mm;
+    top: 16mm;
+  }
+}

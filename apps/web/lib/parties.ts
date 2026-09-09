@@ -205,8 +205,8 @@ export const partyApi = (kind: PartyKind) => ({
     z
       .object({
         profile: profileSchema,
-        summary: z.record(z.string(), z.null()),
-        dataStatus: z.literal("not_available"),
+        summary: z.record(z.string(), z.union([z.null(), z.string(), z.number()])),
+        dataStatus: z.enum(["not_available", "partial"]),
         ledgerEntries: z.array(z.never()),
         activity: z.array(z.never()),
       })

@@ -92,6 +92,7 @@ describe.each(['customers', 'suppliers'] as const)(
       businessMember: { findUnique: vi.fn() },
       business: { update: vi.fn() },
       customer: delegate,
+      invoice: { aggregate: vi.fn() },
       supplier: delegate,
       $transaction: vi.fn(),
     };
@@ -100,6 +101,7 @@ describe.each(['customers', 'suppliers'] as const)(
       db.authSession.findUnique.mockResolvedValue(session);
       db.businessMember.findUnique.mockResolvedValue({ role: 'OWNER' });
       db.business.update.mockResolvedValue({ [counter]: 1 });
+      db.invoice.aggregate.mockResolvedValue({ _sum: { grandTotal: new Prisma.Decimal('456.78') }, _count: { id: 3 } });
       db.$transaction.mockImplementation((fn) => fn(db));
       delegate.create.mockImplementation(({ data }) => ({
         ...stored,
@@ -256,13 +258,18 @@ describe.each(['customers', 'suppliers'] as const)(
     ])('rejects invalid query %s', async (query) => {
       await get(query).expect(400);
     });
-    it('returns detail with empty ledger and unavailable transaction totals', async () => {
+    it('returns detail with empty ledger and current Phase 6 customer sales totals', async () => {
       const result = await get('/' + id).expect(200);
       expect(result.body.ledgerEntries).toEqual([]);
       expect(result.body.activity).toEqual([]);
-      expect(Object.values(result.body.summary).every((v) => v === null)).toBe(
-        true,
-      );
+      if (kind === 'customers') {
+        expect(result.body.summary.totalSales).toBe('456.78');
+        expect(result.body.summary.invoiceCount).toBe(3);
+        expect(result.body.summary.totalPaid).toBeNull();
+        expect(result.body.summary.outstanding).toBeNull();
+      } else {
+        expect(Object.values(result.body.summary).every((v) => v === null)).toBe(true);
+      }
       expect(delegate.findFirst.mock.calls[0]![0].where).toMatchObject({
         id,
         businessId: 'business-a',

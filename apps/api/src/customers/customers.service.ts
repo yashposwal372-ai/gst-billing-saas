@@ -132,15 +132,20 @@ export class CustomersService {
       where: { ...ownerScope(user), id },
     });
     if (!row) throw new NotFoundException('Customer not found');
+    const summary = await this.db.invoice.aggregate({
+      where: { ...ownerScope(user), customerId: id, status: 'FINALIZED' },
+      _sum: { grandTotal: true },
+      _count: { id: true },
+    });
     return {
       profile: this.profile(row),
       summary: {
-        totalSales: null,
+        totalSales: (summary._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2),
         totalPaid: null,
         outstanding: null,
-        invoiceCount: null,
+        invoiceCount: summary._count.id,
       },
-      dataStatus: 'not_available',
+      dataStatus: 'partial',
       ledgerEntries: [],
       activity: [],
     };
