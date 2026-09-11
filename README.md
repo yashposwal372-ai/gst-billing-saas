@@ -74,6 +74,16 @@ git diff --check
 
 Tailwind 4 uses @tailwindcss/postcss and CSS imports; existing App Router/CSS modules remain. Zod validates frontend API configuration. No frontend form/test framework was added.
 
+
+## Phase 9 internal GST reports (2026-09-11)
+
+Phase 9 provides internal book GST reports from finalized recorded transactions. These reports do not file GST returns, connect to GSTN, generate government upload files, validate GSTINs with the government, calculate ITC eligibility, certify compliance, create IRN/QR/e-way bills, or provide statutory tax advice.
+
+Backend endpoints under `/api/v1/gst-reports` include summary, sales register, purchase register, output tax, purchase tax recorded, GST-rate summary, HSN/SAC summary, place-of-supply summary, operational returns summary, and CSV exports for sales register, purchase register and HSN/SAC. Sales reports use finalized invoices only. Purchase reports use finalized purchase bills only. Operational returns are shown separately and are not netted into GST summaries because statutory GST Credit Note / Debit Note treatment is not implemented.
+
+Frontend routes under `/gst-reports` provide report summary cards, filters, printable report views, CSV export links and drill-down links to invoice or purchase bill detail pages. Use Purchase GST Recorded / Purchase Tax Recorded wording; do not present purchase totals as ITC eligibility or claimable tax.
+
+No Phase 9 database migration was required. Existing Phase 6/7 snapshot columns and indexes support the implemented reporting views. Browser smoke support exists through `node apps/web/scripts/dashboard-smoke.mjs --gst-reports`, but local outside-sandbox Chrome execution was blocked by automatic approval review unless explicitly approved.
 ## Phase 8 payments, expenses and banking (2026-09-09)
 
 Phase 8 is bookkeeping and settlement recording only. It does not move money, verify bank balances, synchronize bank feeds, process cards/UPI, clear cheques, integrate with RBI/NPCI, or perform automatic reconciliation. Account balances are internal ledger balances and may be negative because the app records business activity rather than authorizing external funds.
@@ -96,7 +106,7 @@ All routes use `/api/v1`. Auth exposes POST `/auth/signup`, `/auth/login`, `/aut
 
 Passwords use Argon2id. Access and rotating opaque refresh tokens use HttpOnly, SameSite=Lax cookies; production adds Secure and cookie prefixes. Deploy the frontend and API on the same site over HTTPS. Writes require the exact configured Origin and `X-CSRF-Protection: 1`; fetch includes credentials. Refresh tokens are stored as SHA-256 hashes, have a fixed 30-day session lifetime, and reuse revokes the session. Every authenticated request checks session revocation and user status/version. Password reset expires after 30 minutes, verification after 24 hours; both are single-use. Auth writes share an in-memory limit of 30 requests per IP per 15 minutes. Multi-instance rate limiting and deployment proxy configuration remain future deployment work.
 
-No reset or verification emails are sent. The local-only `npm run auth:local-token --workspace api -- verify <email>` utility now issues and consumes a verification token internally without printing it. The `reset <email>` variant reads a 12â€“128 character password from redirected stdin, never a command-line argument. It rejects production and remote database hosts; its live database behavior is untested here. User-facing recovery requires a future email delivery integration.
+No reset or verification emails are sent. The local-only `npm run auth:local-token --workspace api -- verify <email>` utility now issues and consumes a verification token internally without printing it. The `reset <email>` variant reads a 12Ã¢â‚¬â€œ128 character password from redirected stdin, never a command-line argument. It rejects production and remote database hosts; its live database behavior is untested here. User-facing recovery requires a future email delivery integration.
 
 Install, lint, typecheck, build, Prisma format/validate/generate passed. Fresh offline migration generation matches the existing SQL. Unit tests: 56 passed. HTTP/e2e: 15 passed, including the four foundation tests; one real PostgreSQL integration test skipped. To run that test later, migrate a dedicated database whose name ends in `_test`, set `TEST_DATABASE_URL` for the API test process, and run `npm run test:e2e --workspace api`. It cleans up only its own records.
 
@@ -151,7 +161,7 @@ PATCH `{"isActive":true}` reactivates categories/items; DELETE never physically 
 
 Category names are case-insensitively unique within a business. Optional trimmed SKU and barcode are case-sensitive and business-unique; empty strings clear optional values. Codes use `PRD-000001` onward, allocated by an atomic business counter in the same transaction as item creation and opening stock. A failed transaction rolls back the counter and records together; live concurrency remains unverified.
 
-PRODUCT items may track inventory; SERVICE items cannot carry stock or accept adjustments. Type, unit and tracking mode are fixed after creation. Units: PCS, NOS, KG, G, LTR, ML, MTR, BOX, PACK, SET, HOUR, DAY, SERVICE; no unit conversion. HSN accepts 4/6/8 digits, SAC accepts 6 digits starting with 99. GST rate accepts 0â€“100 with up to two decimals. These are format checks, not official classification/rate verification or tax calculation.
+PRODUCT items may track inventory; SERVICE items cannot carry stock or accept adjustments. Type, unit and tracking mode are fixed after creation. Units: PCS, NOS, KG, G, LTR, ML, MTR, BOX, PACK, SET, HOUR, DAY, SERVICE; no unit conversion. HSN accepts 4/6/8 digits, SAC accepts 6 digits starting with 99. GST rate accepts 0Ã¢â‚¬â€œ100 with up to two decimals. These are format checks, not official classification/rate verification or tax calculation.
 
 Send prices as nonnegative decimal strings with up to two decimals (Decimal(15,2)); quantities use up to three decimals (Decimal(18,3)). Responses serialize prices/rates with two places and quantities with three. Stock source of truth is Product.currentStock plus append-only StockMovement records. Nonzero opening stock creates an OPENING movement in the creation transaction; zero stock creates none. Normal PATCH rejects opening/current stock fields. Adjustments use `{"direction":"INCREASE","quantity":"0.001","reason":"Physical count correction"}` or DECREASE, with exact Decimal arithmetic, Serializable transactions, bounded conflict retries and conditional stock updates. Quantity must be positive; negative resulting stock and overflow are rejected. Each movement records quantity, before/after stock, reason, actor and time. There are no movement update/delete endpoints.
 

@@ -17,16 +17,16 @@ function containDialogFocus(event: ReactKeyboardEvent<HTMLDialogElement>) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 }
 
-const destinations: Record<string,string> = {Invoices:"/invoices",Quotations:"/quotations","Sales Orders":"/sales-orders","Delivery Challans":"/delivery-challans",Returns:"/sales-returns","Purchase Bills":"/purchase-bills","Purchase Orders":"/purchase-orders","Purchase Returns":"/purchase-returns",Receivables:"/receivables",Payables:"/payables","Payment History":"/payments",Expenses:"/expenses","Expense Categories":"/expense-categories",Banking:"/accounts",Accounts:"/accounts","Account Transfers":"/account-transfers",Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory"};
+const destinations: Record<string,string> = {Invoices:"/invoices",Quotations:"/quotations","Sales Orders":"/sales-orders","Delivery Challans":"/delivery-challans",Returns:"/sales-returns","Purchase Bills":"/purchase-bills","Purchase Orders":"/purchase-orders","Purchase Returns":"/purchase-returns",Receivables:"/receivables",Payables:"/payables","Payment History":"/payments",Expenses:"/expenses","Expense Categories":"/expense-categories",Banking:"/accounts",Accounts:"/accounts","Account Transfers":"/account-transfers",Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory","GST Dashboard":"/gst-reports","GST Reports":"/gst-reports", "HSN Summary":"/gst-reports/hsn-sac"};
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { summary } = useWorkspace();
   return <>
-    <Link href="/dashboard" className={styles.brand} onClick={onNavigate}><span className={styles.brandMark}>G<span>·</span></span><span>GST Billing<small>BUSINESS WORKSPACE</small></span></Link>
+    <Link href="/dashboard" className={styles.brand} onClick={onNavigate}><span className={styles.brandMark}>G<span>Â·</span></span><span>GST Billing<small>BUSINESS WORKSPACE</small></span></Link>
     <div className={styles.businessSelector}>
       <Icon name="building" /><div><span className={styles.eyebrow}>CURRENT BUSINESS</span>
-        <strong title={summary?.business?.name}>{summary?.business?.name ?? "Your business"}</strong><small>{summary?.business ? "Owner · Single business" : "Business context loading"}</small></div>
+        <strong title={summary?.business?.name}>{summary?.business?.name ?? "Your business"}</strong><small>{summary?.business ? "Owner Â· Single business" : "Business context loading"}</small></div>
     </div>
     <nav aria-label="Application navigation" className={styles.navigation}>
       <p className={styles.navCaption}>WORKSPACE <span>Upcoming modules marked soon</span></p>
@@ -61,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   async function logout() {
     setBusy(true); setError("");
     try { await auth.logout(); router.replace("/login"); }
-    catch { setError("Couldn’t sign out. Please try again."); }
+    catch { setError("Couldnâ€™t sign out. Please try again."); }
     finally { setBusy(false); }
   }
   const name = [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(" ");
@@ -83,14 +83,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className={styles.accountPopover}><strong>{name}</strong><p>{auth.user?.email}</p><span className={styles.pill}>{summary?.business?.role === "OWNER" ? "Owner workspace" : "Business account"}</span>
               <Link href="/onboarding" onClick={() => menu.current?.removeAttribute("open")}><Icon name="building" />Business profile</Link>
               <button disabled><Icon name="settings" />Account settings <small>Soon</small></button>
-              <button onClick={() => void logout()} disabled={busy}><Icon name="logout" />{busy ? "Signing out…" : "Sign out"}</button>
+              <button onClick={() => void logout()} disabled={busy}><Icon name="logout" />{busy ? "Signing outâ€¦" : "Sign out"}</button>
               {error && <p role="alert" className={styles.errorText}>{error}</p>}
             </div>
           </details>
         </div>
       </header>
       <main id="workspace-main" tabIndex={-1} className={styles.main}>{children}</main>
-      <footer className={styles.footer}><span>GST Billing · Your business workspace</span><span>Financial modules coming soon</span></footer>
+      <footer className={styles.footer}><span>GST Billing Â· Your business workspace</span><span>Financial modules coming soon</span></footer>
     </div>
     <dialog ref={notice} aria-labelledby="notifications-title" className={styles.notice} onKeyDown={containDialogFocus}>
       <button autoFocus className={styles.iconButton} aria-label="Close notifications" onClick={() => notice.current?.close()}><Icon name="close" /></button>

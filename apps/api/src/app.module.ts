@@ -16,6 +16,7 @@ import { CatalogueModule } from './catalogue/catalogue.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
 import { BusinessDocumentsModule } from './business-documents/business-documents.module.js';
 import { FinanceModule } from './finance/finance.module.js';
+import { GstReportsModule } from './gst-reports/gst-reports.module.js';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { FinanceModule } from './finance/finance.module.js';
     InvoicesModule,
     BusinessDocumentsModule,
     FinanceModule,
+    GstReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
