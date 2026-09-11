@@ -13,7 +13,7 @@ Next.js :3000 (apps/web)
 packages/ -> shared UI, ESLint, TypeScript
 ```
 
-NestJS owns database access and business logic. Next.js never connects to PostgreSQL or receives backend secrets. Future financial/inventory writes must use transactions where required; tenant records must enforce business isolation and justified indexes.
+NestJS owns database access and business logic. Next.js never connects to PostgreSQL or receives backend secrets. Future financial/inventory writes must use transactions where required; tenant records must enforce business isolation and justified indexes. The current runtime architecture remains a NestJS modular monolith; the target architecture is NestJS microservices reached through a Strangler Fig migration. The internal backend architecture foundation and migration rulebook are documented in [docs/architecture/backend-architecture.md](docs/architecture/backend-architecture.md).
 
 ## Requirements and installation
 

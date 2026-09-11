@@ -33,7 +33,8 @@
     "pretest:e2e": "prisma generate",
     "auth:local-token": "npm run build && node dist/auth/local-token.js",
     "prisma:deploy": "prisma migrate deploy",
-    "pretest": "prisma generate"
+    "pretest": "prisma generate",
+    "architecture:check": "node scripts/architecture-check.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

@@ -11,6 +11,16 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
 
+
+## Architecture track A03 foundation: 2026-09-11
+
+- Architecture track A01 Existing Project Architecture Audit and A02 Target Service Boundaries & Contract Design are complete. Phase 10 POS Billing is checkpointed at 7a8254f6ded656c9781ca9755a3f6aed94eb7f54.
+- A03 keeps the backend as the current NestJS modular monolith. No API Gateway, physical microservice, Kafka, outbox/inbox, service-owned database schema, Prisma model change, migration, frontend feature change or Phase 11 work is introduced.
+- New backend architecture foundation primitives live under apps/api/src/platform using domain/application/infrastructure/presentation folders. Domain code must not import NestJS, Prisma, Redis, BullMQ, Kafka, HTTP/presentation or infrastructure code. Application code must not import presentation code or infrastructure implementations.
+- DomainError, RequestContext and HTTP error response contract primitives are framework-independent scaffolding for future bounded-context migration. Existing guards, public API behavior and legacy module error handling remain unchanged.
+- The architecture guard runs with `npm run architecture:check` and currently checks the new platform Clean Architecture area without failing legacy modular-monolith folders that are not migrated yet.
+- Durable architecture documentation is in docs/architecture/backend-architecture.md. It records current vs target architecture, Strangler migration, service ownership, database stages and the rule that party-service remains the first planned physical extraction in a later step.
+- PostgreSQL and Redis runtime limitations remain unchanged unless later verified. A04 Contract Foundation + OpenAPI requires explicit new authorization.
 ## Verified Phase 8 implementation: 2026-09-09
 
 - Started from approved clean Phase 7 checkpoint 53527f95d1a5cf9b8da35b98b649da1ae488791a. No Phase 9 work, push, reset, destructive Prisma operation, Docker installation or forced audit fix was performed.
