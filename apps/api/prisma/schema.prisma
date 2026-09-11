@@ -45,6 +45,11 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum InvoiceSalesChannel {
+  STANDARD
+  POS
+}
+
 enum InvoicePriceMode {
   EXCLUSIVE
   INCLUSIVE
@@ -507,6 +512,8 @@ model Invoice {
   businessId             String              @db.Uuid
   business               Business            @relation(fields: [businessId], references: [id], onDelete: Restrict)
   status                 InvoiceStatus       @default(DRAFT)
+  salesChannel           InvoiceSalesChannel @default(STANDARD)
+  posClientCheckoutId    String?             @db.Uuid
   invoiceNumber          String?             @db.VarChar(40)
   sequenceNumber         Int?
   financialYear          String              @db.Char(7)
@@ -580,7 +587,9 @@ model Invoice {
 
   @@unique([id, businessId])
   @@unique([businessId, invoiceNumber])
+  @@unique([businessId, posClientCheckoutId])
   @@index([businessId, status, invoiceDate])
+  @@index([businessId, salesChannel, status, invoiceDate])
   @@index([businessId, customerId])
   @@index([createdById])
   @@index([finalizedById])

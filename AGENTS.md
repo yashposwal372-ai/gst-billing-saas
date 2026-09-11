@@ -26,6 +26,19 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Phase 9 GST Reports requires explicit new authorization.
 
 
+## Phase 10 POS Billing working state: 2026-09-11
+
+- Started from approved Phase 9 checkpoint f0fd2e513f0f033abe8029fc0999e37b36dbcec5. No Phase 11 work, commit, push, reset, destructive Prisma operation, Docker/PostgreSQL/Redis installation or forced audit fix was performed.
+- POS is implemented as a fast retail workflow over the existing Invoice, InvoiceCalculator, stock movement and Phase 8 customer receipt/payment ledger domains. Completed POS sales are normal finalized Invoice records with salesChannel POS. There is no separate POS sale financial record, duplicate GST calculator, duplicate inventory ledger or duplicate payment ledger.
+- Phase 10 schema metadata adds InvoiceSalesChannel STANDARD/POS, Invoice.salesChannel default STANDARD, Invoice.posClientCheckoutId and indexes for POS history/idempotency. Migration 20260911120000_phase10_pos_billing was generated offline and inspected; migration application NOT RUN.
+- Walk-in POS uses explicit invoice snapshots with customerId null, buyer name Walk-in Customer, no GSTIN and business address defaults. It does not create fake GSTINs or anonymous CRM customers. Existing active customers can be selected when needed.
+- POS APIs under /api/v1/pos include bounded active product search, exact barcode lookup, preview, checkout and POS sales history. Product search covers name, product code, SKU and barcode; barcode scanners are treated as keyboard input.
+- POS preview calls the existing invoice draft/calculator path. Checkout uses safe two-step semantics: finalize the POS invoice first through the existing invoice finalization/stock transaction, then optionally create and post a Phase 8 CUSTOMER_RECEIPT payment. If payment posting fails after finalization, the invoice remains finalized and outstanding.
+- Single recorded tender and Pay Later are supported. Split tender and persistent held carts are deferred. Cash change due is display-only; only the retained invoice total is posted. No real UPI/card processing, payment gateway, bank sync, offline sync or camera barcode scanning is implemented.
+- POS UI routes include /pos, /pos/sales and /pos/receipt/:invoiceId with product search/barcode, cart editing, discount, price mode, server preview, customer selection, recorded payment, checkout result, 80mm receipt and A4 invoice links.
+- Tests cover POS product/barcode lookup, walk-in preview, Pay Later checkout, recorded payment, change due, idempotency guards, POS sales history, tenant/unknown-field rejection and opt-in PostgreSQL checkout concurrency/idempotency cases. Browser smoke support for --pos covers responsive POS flow, scanner input, repeated scan quantity merge, service add, discount, preview, customer toggle, out-of-stock/unknown barcode states, sales history and receipt print route.
+- PostgreSQL and Redis remain unavailable locally unless later verified. Real PostgreSQL concurrency tests remain skipped without TEST_DATABASE_URL. Phase 11 Warehouse + Branch Management requires explicit new authorization.
+
 ## Phase 9 GST Reports working state: 2026-09-11
 
 - Started from clean approved Phase 8 checkpoint 1abcdb6710f93edfeae7e0fec3e1a937e89e846c. No Phase 10 work, push, reset, destructive Prisma operation, Docker installation, PostgreSQL/Redis installation or forced audit fix was performed.

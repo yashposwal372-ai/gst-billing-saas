@@ -17,7 +17,7 @@ function containDialogFocus(event: ReactKeyboardEvent<HTMLDialogElement>) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 }
 
-const destinations: Record<string,string> = {Invoices:"/invoices",Quotations:"/quotations","Sales Orders":"/sales-orders","Delivery Challans":"/delivery-challans",Returns:"/sales-returns","Purchase Bills":"/purchase-bills","Purchase Orders":"/purchase-orders","Purchase Returns":"/purchase-returns",Receivables:"/receivables",Payables:"/payables","Payment History":"/payments",Expenses:"/expenses","Expense Categories":"/expense-categories",Banking:"/accounts",Accounts:"/accounts","Account Transfers":"/account-transfers",Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory","GST Dashboard":"/gst-reports","GST Reports":"/gst-reports", "HSN Summary":"/gst-reports/hsn-sac"};
+const destinations: Record<string,string> = {POS:"/pos",Invoices:"/invoices",Quotations:"/quotations","Sales Orders":"/sales-orders","Delivery Challans":"/delivery-challans",Returns:"/sales-returns","Purchase Bills":"/purchase-bills","Purchase Orders":"/purchase-orders","Purchase Returns":"/purchase-returns",Receivables:"/receivables",Payables:"/payables","Payment History":"/payments",Expenses:"/expenses","Expense Categories":"/expense-categories",Banking:"/accounts",Accounts:"/accounts","Account Transfers":"/account-transfers",Customers:"/customers",Suppliers:"/suppliers",Products:"/products",Categories:"/categories",Stock:"/inventory","GST Dashboard":"/gst-reports","GST Reports":"/gst-reports", "HSN Summary":"/gst-reports/hsn-sac"};
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();

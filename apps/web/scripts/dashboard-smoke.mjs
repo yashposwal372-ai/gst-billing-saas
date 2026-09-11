@@ -14,9 +14,10 @@ import { createInvoiceFixtures, runInvoiceSmoke } from './invoice-smoke.mjs';
 import { createPhase7Fixtures, runPhase7Smoke } from './phase7-smoke.mjs';
 import { createPhase8Fixtures, runPhase8Smoke } from './phase8-smoke.mjs';
 import { createGstReportFixtures, runGstReportsSmoke } from './gst-reports-smoke.mjs';
+import { createPosFixtures, runPosSmoke } from './pos-smoke.mjs';
 
 const webRoot = fileURLToPath(new URL('../', import.meta.url));
-const browserPath = process.argv.slice(2).find(arg => !['--parties','--catalogue','--invoices','--phase7','--phase8','--gst-reports'].includes(arg)) ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const browserPath = process.argv.slice(2).find(arg => !['--parties','--catalogue','--invoices','--phase7','--phase8','--gst-reports','--pos'].includes(arg)) ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const partyMode = process.argv.includes('--parties');
 const partyFixtures = createPartyFixtures();
 const catalogueMode=process.argv.includes("--catalogue");
@@ -29,6 +30,8 @@ const phase8Mode=process.argv.includes("--phase8");
 const phase8Fixtures=createPhase8Fixtures();
 const gstReportsMode=process.argv.includes("--gst-reports");
 const gstReportFixtures=createGstReportFixtures();
+const posMode=process.argv.includes("--pos");
+const posFixtures=createPosFixtures();
 const artifacts = await mkdtemp(join(tmpdir(), 'gst-dashboard-smoke-'));
 const origin = 'http://localhost:3000';
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -78,7 +81,7 @@ try {
     if (message.method === 'Fetch.requestPaused') {
       const { requestId, request } = message.params; const url = new URL(request.url);
       let code = 200; let body = {};
-      const partyResponse = gstReportsMode ? await gstReportFixtures.respond(url, request) : phase8Mode ? await phase8Fixtures.respond(url, request) : phase7Mode ? await phase7Fixtures.respond(url, request) : invoiceMode ? await invoiceFixtures.respond(url, request) : await catalogueFixtures.respond(url, request) ?? await partyFixtures.respond(url, request);
+      const partyResponse = posMode ? await posFixtures.respond(url, request) : gstReportsMode ? await gstReportFixtures.respond(url, request) : phase8Mode ? await phase8Fixtures.respond(url, request) : phase7Mode ? await phase7Fixtures.respond(url, request) : invoiceMode ? await invoiceFixtures.respond(url, request) : await catalogueFixtures.respond(url, request) ?? await partyFixtures.respond(url, request);
       if (partyResponse) { code = partyResponse.code; body = partyResponse.body; }
       else if (url.pathname.endsWith('/auth/me')) { code = signedIn ? 200 : 401; body = { user: { ...testUser, currentBusinessId: noBusiness ? null : testUser.currentBusinessId } }; }
       else if (url.pathname.endsWith('/auth/logout')) { signedIn = false; logoutCalled = true; body = { status: 'ok' }; }
@@ -116,7 +119,8 @@ try {
     await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code, windowsVirtualKeyCode });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode });
   };
-  if (gstReportsMode) await runGstReportsSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:gstReportFixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
+  if (posMode) await runPosSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:posFixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
+  else if (gstReportsMode) await runGstReportsSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:gstReportFixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
   else if (phase8Mode) await runPhase8Smoke({send,evaluate,navigate,key,until,artifacts,fixtures:phase8Fixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
   else if (phase7Mode) await runPhase7Smoke({send,evaluate,navigate,key,until,artifacts,fixtures:phase7Fixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});
   else if (invoiceMode) await runInvoiceSmoke({send,evaluate,navigate,key,until,artifacts,fixtures:invoiceFixtures}).catch(async error=>{console.error(await evaluate("document.body.innerText"));throw error;});

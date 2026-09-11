@@ -17,6 +17,7 @@ import { InvoicesModule } from './invoices/invoices.module.js';
 import { BusinessDocumentsModule } from './business-documents/business-documents.module.js';
 import { FinanceModule } from './finance/finance.module.js';
 import { GstReportsModule } from './gst-reports/gst-reports.module.js';
+import { PosModule } from './pos/pos.module.js';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { GstReportsModule } from './gst-reports/gst-reports.module.js';
     BusinessDocumentsModule,
     FinanceModule,
     GstReportsModule,
+    PosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

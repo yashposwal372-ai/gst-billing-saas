@@ -75,6 +75,14 @@ git diff --check
 Tailwind 4 uses @tailwindcss/postcss and CSS imports; existing App Router/CSS modules remain. Zod validates frontend API configuration. No frontend form/test framework was added.
 
 
+## Phase 10 POS billing (2026-09-11)
+
+Phase 10 adds a focused authenticated POS route at `/pos`, POS sales history at `/pos/sales`, and an 80mm receipt print route at `/pos/receipt/:invoiceId`. POS is a retail workflow over existing domains: completed sales are normal finalized Invoice records with `salesChannel = POS`; GST uses the existing invoice calculator; stock movements remain the existing invoice finalization movements; recorded payments use Phase 8 customer receipt/payment allocation and MoneyAccount ledger behavior. No separate POS financial record, payment gateway, UPI processing, camera scanning, warehouse, or offline sync is implemented.
+
+Walk-in sales use explicit invoice snapshots with `customerId = null`, `Walk-in Customer` as the buyer snapshot, no GSTIN, and seller-state billing snapshot defaults. This avoids creating fake GSTINs or polluting CRM with anonymous customers. Existing customers can still be selected for normal customer snapshots. POS product lookup is bounded and active-only, covering name, product code, SKU and barcode; exact barcode lookup supports keyboard-style scanners and repeated scans merge into the cart when price/discount/mode match. Held carts are deferred; carts are browser state only and do not reserve stock.
+
+POS checkout uses a safe two-step backend architecture: it first creates and finalizes the POS invoice through the existing invoice service, assigning the permanent invoice number and applying stock validation/deduction in the existing Serializable invoice transaction. If a recorded payment is selected, it then creates and posts a Phase 8 customer receipt against the finalized invoice. If payment recording fails, the finalized sale remains valid and outstanding; the UI reports that payment was not recorded. `posClientCheckoutId` provides durable duplicate-submit protection for checkout retries. Cash change due is display-only; only the retained invoice total is posted as the recorded payment.
+
 ## Phase 9 internal GST reports (2026-09-11)
 
 Phase 9 provides internal book GST reports from finalized recorded transactions. These reports do not file GST returns, connect to GSTN, generate government upload files, validate GSTINs with the government, calculate ITC eligibility, certify compliance, create IRN/QR/e-way bills, or provide statutory tax advice.

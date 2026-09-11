@@ -4,7 +4,7 @@ export const navigation: readonly NavigationItem[] = [
   { label: "Dashboard", icon: "grid", href: "/dashboard" },
   { label: "Sales", icon: "document", children: ["Invoices", "Quotations", "Sales Orders", "Delivery Challans", "Returns"] },
   { label: "Purchases", icon: "bag", children: ["Purchase Bills", "Purchase Orders", "Purchase Returns"] },
-  { label: "POS", icon: "monitor" },
+  { label: "POS", icon: "monitor", href: "/pos" },
   { label: "Inventory", icon: "box", children: ["Products", "Categories", "Stock", "Warehouses", "Stock Transfers", "Barcode"] },
   { label: "Parties", icon: "people", children: ["Customers", "Suppliers"] },
   { label: "Payments", icon: "wallet", children: ["Receivables", "Payables", "Payment History"] },

@@ -53,6 +53,13 @@ export class InvoicesService {
     );
   }
 
+  async previewPos(user: SafeUser, dto: InvoiceDraftDto) {
+    return this.db.$transaction(
+      async (tx) => (await this.buildDraft(tx, await requireOwner(tx, user), user, dto, { walkIn: !dto.customerId, salesChannel: 'POS' })).invoice,
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+
   async create(user: SafeUser, dto: InvoiceDraftDto) {
     return serializable(this.db, async (tx) => {
       const scope = await requireOwner(tx, user);
@@ -67,6 +74,24 @@ export class InvoicesService {
         include: invoiceInclude,
       });
       return this.view(row);
+    });
+  }
+
+  async createFinalizedPosInvoice(user: SafeUser, dto: InvoiceDraftDto, clientCheckoutId: string) {
+    return serializable(this.db, async (tx) => {
+      const scope = await requireOwner(tx, user);
+      const existing = await tx.invoice.findFirst({ where: { ...scope, posClientCheckoutId: clientCheckoutId }, include: invoiceInclude });
+      if (existing) return this.view(existing);
+      const draft = await this.buildDraft(tx, scope, user, dto, { walkIn: !dto.customerId, salesChannel: 'POS', posClientCheckoutId: clientCheckoutId });
+      const invoice = await tx.invoice.create({ data: { ...draft.invoiceData, businessId: scope.businessId, createdById: user.id, lines: { create: draft.linesData } }, include: invoiceInclude });
+      const totals = await this.productQuantities(tx, scope, invoice.lines);
+      this.assertStockAvailable(totals);
+      const sequence = await tx.invoiceSequence.upsert({ where: { businessId_financialYear: { businessId: scope.businessId, financialYear: invoice.financialYear } }, create: { businessId: scope.businessId, financialYear: invoice.financialYear, nextNumber: 1 }, update: { nextNumber: { increment: 1 } }, select: { nextNumber: true } });
+      const number = await this.invoiceNumber(tx, scope.businessId, invoice.financialYear, sequence.nextNumber);
+      const changed = await tx.invoice.updateMany({ where: { ...scope, id: invoice.id, status: 'DRAFT', invoiceNumber: null, sequenceNumber: null }, data: { status: 'FINALIZED', sequenceNumber: sequence.nextNumber, invoiceNumber: number, finalizedAt: new Date(), finalizedById: user.id } });
+      if (changed.count !== 1) throw new ConflictException('Invoice was already finalized');
+      await this.applyStock(tx, scope, user, invoice.id, totals, 'finalize');
+      return this.view(await tx.invoice.findFirstOrThrow({ where: { ...scope, id: invoice.id }, include: invoiceInclude }));
     });
   }
 
@@ -284,6 +309,7 @@ export class InvoicesService {
     scope: Scope,
     _user: SafeUser,
     dto: InvoiceDraftDto,
+    options: { walkIn?: boolean; salesChannel?: 'STANDARD' | 'POS'; posClientCheckoutId?: string } = {},
   ) {
     validatePartyState(dto.placeOfSupplyState, dto.placeOfSupplyStateCode);
     const business = await tx.business.findFirstOrThrow({
@@ -294,10 +320,10 @@ export class InvoicesService {
     const customer = dto.customerId
       ? await tx.customer.findFirst({ where: { ...scope, id: dto.customerId } })
       : null;
-    if (!customer) throw new BadRequestException('Choose a customer for this invoice');
-    if (!customer.isActive)
+    if (!customer && !options.walkIn) throw new BadRequestException('Choose a customer for this invoice');
+    if (customer && !customer.isActive)
       throw new BadRequestException('Choose an active customer for this invoice');
-    if (customer.gstRegistered && customer.gstin?.slice(0, 2) !== customer.stateCode)
+    if (customer?.gstRegistered && customer.gstin?.slice(0, 2) !== customer.stateCode)
       throw new BadRequestException('Customer GSTIN state code must match address state code');
     const intra = business.stateCode === dto.placeOfSupplyStateCode;
     const lines = await this.lineData(
@@ -332,10 +358,12 @@ export class InvoicesService {
     const invoiceDate = parseDateOnly(dto.invoiceDate);
     const invoiceData = {
       status: 'DRAFT' as const,
+      salesChannel: options.salesChannel ?? 'STANDARD',
+      posClientCheckoutId: options.posClientCheckoutId ?? null,
       financialYear: financialYear(invoiceDate),
       invoiceDate,
       dueDate: dto.dueDate ? parseDateOnly(dto.dueDate) : null,
-      customerId: customer.id,
+      customerId: customer?.id ?? null,
       placeOfSupplyState: dto.placeOfSupplyState,
       placeOfSupplyStateCode: dto.placeOfSupplyStateCode,
       gstApplicable: business.gstRegistered,
@@ -357,25 +385,25 @@ export class InvoicesService {
       sellerAccountNumber: business.accountNumber,
       sellerIfsc: business.ifsc,
       sellerUpiId: business.upiId,
-      customerCodeSnapshot: customer.customerCode,
-      customerNameSnapshot: customer.displayName,
-      customerBusinessName: customer.businessName,
-      customerGstinSnapshot: customer.gstin,
-      customerPanSnapshot: customer.pan,
-      customerPhoneSnapshot: customer.phone,
-      customerEmailSnapshot: customer.email,
-      billingAddressLine1: customer.addressLine1,
-      billingAddressLine2: customer.addressLine2,
-      billingCity: customer.city,
-      billingState: customer.state,
-      billingStateCode: customer.stateCode,
-      billingPincode: customer.pincode,
-      shippingAddressLine1: customer.shippingAddressLine1,
-      shippingAddressLine2: customer.shippingAddressLine2,
-      shippingCity: customer.shippingCity,
-      shippingState: customer.shippingState,
-      shippingStateCode: customer.shippingStateCode,
-      shippingPincode: customer.shippingPincode,
+      customerCodeSnapshot: customer?.customerCode ?? null,
+      customerNameSnapshot: customer?.displayName ?? 'Walk-in Customer',
+      customerBusinessName: customer?.businessName ?? null,
+      customerGstinSnapshot: customer?.gstin ?? null,
+      customerPanSnapshot: customer?.pan ?? null,
+      customerPhoneSnapshot: customer?.phone ?? null,
+      customerEmailSnapshot: customer?.email ?? null,
+      billingAddressLine1: customer?.addressLine1 ?? business.addressLine1,
+      billingAddressLine2: customer?.addressLine2 ?? business.addressLine2,
+      billingCity: customer?.city ?? business.city,
+      billingState: customer?.state ?? business.state,
+      billingStateCode: customer?.stateCode ?? business.stateCode,
+      billingPincode: customer?.pincode ?? business.pincode,
+      shippingAddressLine1: customer?.shippingAddressLine1 ?? null,
+      shippingAddressLine2: customer?.shippingAddressLine2 ?? null,
+      shippingCity: customer?.shippingCity ?? null,
+      shippingState: customer?.shippingState ?? null,
+      shippingStateCode: customer?.shippingStateCode ?? null,
+      shippingPincode: customer?.shippingPincode ?? null,
       ...totals,
       roundOff: ZERO,
     };
