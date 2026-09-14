@@ -35,3 +35,5 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+# Build-time OpenAPI metadata; canonical reviewed output is docs/openapi/api-v1.json.
+apps/api/src/openapi/generated-metadata.json

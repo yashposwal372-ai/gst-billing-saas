@@ -47,11 +47,15 @@ export function checkArchitectureImports(files) {
   const violations = [];
   for (const file of files) {
     const layer = layerOf(file.path);
-    if (!layer) continue;
+    const contract = file.path.startsWith('packages/contracts/');
+    if (!layer && !contract) continue;
     importPattern.lastIndex = 0;
     let match;
     while ((match = importPattern.exec(file.source)) !== null) {
       const importPath = match[1] ?? match[2];
+      if (contract && (!importPath.startsWith('./') || /(?:domain|infrastructure|controller|service|generated|prisma)/i.test(importPath))) {
+        violations.push(`${file.path}: contracts must contain local transport types only, not ${importPath}`);
+      }
       const targetLayer = importedLayer(importPath, file.path);
       if (layer === 'domain') {
         if (domainForbiddenPackages.some((pattern) => pattern.test(importPath))) {
@@ -87,6 +91,17 @@ export async function collectCheckedSourceFiles(rootUrl = sourceRoot) {
     } catch {
       continue;
     }
+  }
+  const contractsDir = new URL('../../../packages/contracts/', rootUrl);
+  try {
+    const contractsPath = contractsDir.pathname.replace(/^\/(.:\/)/, '$1');
+    for (const file of await walk(contractsPath)) {
+      files.push({ path: 'packages/contracts/' + normalized(relative(contractsPath, file)), source: await readFile(file, 'utf8') });
+    }
+    const manifest = JSON.parse(await readFile(new URL('package.json', contractsDir), 'utf8'));
+    if (Object.keys(manifest.dependencies ?? {}).length || Object.keys(manifest.peerDependencies ?? {}).length) throw new Error('contracts must have no runtime/framework dependencies');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
   }
   return files;
 }

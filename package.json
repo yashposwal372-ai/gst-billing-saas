@@ -8,7 +8,9 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "typecheck": "turbo run typecheck",
-    "architecture:check": "npm run architecture:check --workspace api"
+    "architecture:check": "npm run architecture:check --workspace api",
+    "openapi:generate": "npm run openapi:generate --workspace api",
+    "openapi:check": "npm run openapi:check --workspace api"
   },
   "devDependencies": {
     "prettier": "3.9.6",

@@ -170,9 +170,10 @@ A future `apps/api-gateway` should preserve `/api/v1/*` public routes. Initially
 
 The gateway must not own GST calculation, stock rules, invoice lifecycle, payment rules, tenant domain authorization or business logic.
 
-## Contract foundation preparation
+## Contract foundation
 
-A04 should introduce contract and OpenAPI foundations. Candidate future packages are:
+A04 introduced the current public OpenAPI and transport-contract foundation.
+Future packages may include:
 
 - `packages/contracts`
 - `packages/event-contracts`
@@ -216,6 +217,123 @@ Implementation belongs to A11.
 
 The existing `/api/v1/health` route remains unchanged. A03 does not add `/health/live` or `/health/ready` aliases because route churn is not needed for this foundation step. Future services should expose separate liveness and readiness routes when the API gateway and physical services are introduced.
 
-## A04 next
+## A04 public contract foundation
 
-A04 should implement Contract Foundation + OpenAPI. It should not start until A03 is reviewed and approved.
+A04 adds documentation to the current modular monolith. It does not change public
+routes or runtime DTO validation, serializers, guards, error handling, financial
+engines, frontend behavior or Prisma ownership. Swagger 12.0.1 is the only new
+direct application dependency; its required dependencies match NestJS 12.
+
+Public contract ownership currently belongs to `apps/api`:
+
+- `scripts/openapi-metadata.mjs` inspects TypeScript controller decorators, DTO
+  validators/defaults and structural serialized return types. It discovers the
+  seven document-controller factory instantiations instead of copying their route
+  lists. Unsupported erased response types must receive an explicit wire schema.
+- `src/openapi/response-contracts.ts` explicitly documents legacy response shapes
+  where generic serializers erase type information. It contains transport schemas,
+  not ORM or domain classes. Existing typed return shapes are projected into JSON
+  primitives; generated public schemas contain no Prisma implementation references.
+- `src/openapi/openapi-document.ts` defines security, tags, service-level request
+  requirements and operation descriptions. Runtime docs setup checks paths against
+  Swagger's registered Nest route discovery and authentication/CSRF against actual
+  guards.
+- `src/openapi/openapi.config.ts` mounts read-only `/api/docs` and `/api/docs-json`
+  outside production. Main only invokes this small setup function. Production
+  mounts neither UI, raw spec nor assets. No complicated environment flags were added.
+- `src/openapi/cli.ts` generates/checks the contract from build-time source metadata
+  without constructing Nest, listening or querying infrastructure. Build-time
+  metadata is an ignored artifact, included in the compiled application. Runtime
+  route and guard coverage is verified separately by the documentation setup test.
+
+`npm run openapi:generate` writes `docs/openapi/api-v1.json` and the exact
+`docs/openapi/routes.md` inventory. There are 185 current public operations including
+the preserved `/api/v1` starter and all decorated document lifecycle routes. A route
+being present does not mean every document type permits that transition; existing
+service rules still reject unsupported actions. The docs routes are outside the
+public v1 inventory. `npm run openapi:check` regenerates in memory and compares both
+canonical files without overwriting either. Object keys are sorted recursively;
+arrays retain semantic order. No timestamps, local URLs, secrets or absolute paths
+are generated. Reference/ID/request quality failures stop the check.
+
+### Wire compatibility
+
+The authentication contract is cookie-based: `gst_access` and `gst_refresh` locally;
+`__Host-gst_access` and `__Secure-gst_refresh` in production. Cookies are HttpOnly,
+SameSite=Lax and host-only, with Secure in production. Access path is `/`; refresh
+path is `/api/v1/auth`. Public auth writes still require the exact configured Origin
+and `X-CSRF-Protection: 1`. Refresh requires the refresh cookie, while logout can
+accept absent cookies. No bearer, mobile, OAuth, API-key or internal service scheme
+is advertised. Request/correlation IDs and tracing propagation remain future A05/A06
+work; the A03 RequestContext scaffold is not runtime propagation.
+
+Money is documented as exact decimal strings; quantities use three fractional
+digits where serialized that way. Business dates use YYYY-MM-DD. Existing invoice,
+document and finance generic serializers also truncate lifecycle timestamps to
+date-only strings; party/catalogue/business timestamps retain ISO date-time.
+POS duplicate checkout can return a raw recorded payment with native decimal JSON
+strings and ISO timestamps, unlike newly recorded finance payments. These
+differences are documented, not normalized by A04.
+
+The current global error filter emits `{ statusCode, message, error? }`, with message
+sometimes an array for validation. `LegacyError` documents it. `StandardError`
+documents the A03 `{ code, message, requestId?, details? }` foundation separately;
+it is not falsely advertised as the current global response. No error pipeline was
+rewritten. Examples contain no credentials or real taxpayer/bank/customer data.
+
+Response schemas preserve meaningful envelope differences: party details include
+summary data, stock history omits totalPages, report summaries are not paginated,
+and current POS payment-status filtering counts the filtered current page. Explicit
+record schemas describe stable useful fields and permit additional existing snapshot
+fields; they do not claim an exhaustive closed schema for every legacy nested
+relation. Cross-field validation, lifecycle restrictions and accepted-but-ignored
+legacy query fields are explained in operation descriptions. Runtime remains the
+authority; do not treat OpenAPI as a replacement business-rule validator.
+
+### Shared transport package and contract policy
+
+`packages/contracts` is type-only and framework-neutral: version/prefix types,
+existing pagination envelope, current/future error envelopes, browser write header
+types and decimal/date semantic aliases. It has no runtime dependencies. It must
+not import external frameworks, domain entities, repositories, controllers,
+services, generated Prisma types or database infrastructure. The architecture guard
+checks these imports and rejects runtime/peer dependencies. Existing DTOs were not
+moved into the package. Event contracts remain deferred to A11; no active event
+package, Kafka, outbox or inbox exists.
+
+Operation IDs are stable public identifiers derived from route/resource semantics,
+not controller class names or implementation handler names. Examples include
+`auth.login`, `customers.deactivate`, `invoices.finalize` and `pos.checkout`.
+Method suffixes distinguish named paths where required. Renaming an operation ID
+requires explicit contract review even if its HTTP route does not change.
+
+Public API version remains `/api/v1`. Compatible additive changes may stay v1.
+Removals, renames and changes to wire types or semantics require a deliberate
+compatibility window/migration plan or v2 as appropriate. Every public change must:
+
+1. Update runtime code and relevant explicit contract schemas/descriptions.
+2. Run `npm run openapi:generate`.
+3. Review the OpenAPI and route-inventory diffs.
+4. Run contract and functional tests, plus architecture/lint/typecheck/build checks.
+5. Intentionally include the updated snapshot with the code change.
+
+Unexpected drift is a failure. The generator supports the current decorator
+conventions; new controller factories or novel validator shapes need deliberate
+extractor support and tests. Type inference cannot prove that arbitrary future
+serializer changes preserve semantics; review explicit schemas whenever those
+serializers change. Restart development after contract-source edits to refresh
+build-time metadata.
+
+### Future Gateway and clients
+
+A05 will introduce the Gateway, initially routing `/api/v1/*` to this monolith.
+Later the Gateway will own/aggregate public OpenAPI as route groups migrate.
+The intended client direction is Gateway OpenAPI → generated typed clients →
+Next.js / React Native. No client generator or frontend API migration is introduced
+in A04. Internal `/internal/v1/*` contracts will be separate and are not published
+in this public snapshot. Party remains the first later physical extraction after
+A04–A07 prerequisites.
+
+## A05 next
+
+A05 — API Gateway Foundation requires explicit authorization. It has not started.

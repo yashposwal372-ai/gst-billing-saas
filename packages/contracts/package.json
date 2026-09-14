@@ -1,0 +1,8 @@
+{
+  "name": "@gst/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Framework-neutral public HTTP transport types; no runtime or domain logic",
+  "types": "index.d.ts",
+  "exports": { ".": { "types": "./index.d.ts" } }
+}

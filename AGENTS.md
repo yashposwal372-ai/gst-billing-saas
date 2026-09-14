@@ -20,7 +20,17 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - DomainError, RequestContext and HTTP error response contract primitives are framework-independent scaffolding for future bounded-context migration. Existing guards, public API behavior and legacy module error handling remain unchanged.
 - The architecture guard runs with `npm run architecture:check` and currently checks the new platform Clean Architecture area without failing legacy modular-monolith folders that are not migrated yet.
 - Durable architecture documentation is in docs/architecture/backend-architecture.md. It records current vs target architecture, Strangler migration, service ownership, database stages and the rule that party-service remains the first planned physical extraction in a later step.
-- PostgreSQL and Redis runtime limitations remain unchanged unless later verified. A04 Contract Foundation + OpenAPI requires explicit new authorization.
+- PostgreSQL and Redis runtime limitations remain unchanged unless later verified. A04 Contract Foundation + OpenAPI is recorded below; A05 requires explicit new authorization.
+
+## Architecture track A04 contract foundation: 2026-09-14
+
+- A04 continues from the approved A03 checkpoint `735d637562c591dc42dd134f62172a4b80f59088`. The runtime backend remains the NestJS modular monolith at `apps/api`; public routes remain `/api/v1/*`.
+- Current public API OpenAPI is generated from Nest controller decorators, DTO validator metadata and explicit legacy response wire schemas. Swagger UI is `/api/docs` and JSON is `/api/docs-json` in development/test; production disables documentation routes and assets. Local docs UI is read-only.
+- `npm run openapi:generate` generates `docs/openapi/api-v1.json` and the 185-operation `docs/openapi/routes.md`; `npm run openapi:check` validates source route coverage, IDs, schema refs and snapshot drift without overwriting snapshots. Both build offline without PostgreSQL, Redis or network. `npm run openapi:test --workspace api` separately checks registered Nest routes/guards, local HTTP documentation, production absence, API health/auth compatibility and offline generation with network/listening forbidden.
+- `packages/contracts` contains framework-neutral transport types only. Its architecture check rejects runtime/peer dependencies and imports outside local transport types. It has no Prisma, services, domain models, database code, Kafka or event contracts.
+- Exact financial decimal wire strings, business-date versus timestamp serializer differences, cookie auth, Origin/`X-CSRF-Protection: 1`, and current `LegacyError` versus future A03 `StandardError` are documented. No public routes, frontend behavior, runtime business logic, guards, error handling or database schema changed.
+- A04 adds Swagger 12.0.1 only; no API Gateway, physical microservice, Kafka, outbox/inbox or Prisma migration exists. Party remains the first planned future physical extraction after prerequisites.
+- Architecture and contract decisions are in `docs/architecture/backend-architecture.md`. A05 — API Gateway Foundation is next and requires explicit authorization. Do not begin A05 or Phase 11 as part of A04.
 ## Verified Phase 8 implementation: 2026-09-09
 
 - Started from approved clean Phase 7 checkpoint 53527f95d1a5cf9b8da35b98b649da1ae488791a. No Phase 9 work, push, reset, destructive Prisma operation, Docker installation or forced audit fix was performed.

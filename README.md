@@ -15,6 +15,54 @@ packages/ -> shared UI, ESLint, TypeScript
 
 NestJS owns database access and business logic. Next.js never connects to PostgreSQL or receives backend secrets. Future financial/inventory writes must use transactions where required; tenant records must enforce business isolation and justified indexes. The current runtime architecture remains a NestJS modular monolith; the target architecture is NestJS microservices reached through a Strangler Fig migration. The internal backend architecture foundation and migration rulebook are documented in [docs/architecture/backend-architecture.md](docs/architecture/backend-architecture.md).
 
+## A04 public API contracts (2026-09-12)
+
+The current backend remains the NestJS modular monolith in `apps/api`. No API
+Gateway or physical microservices have been created. Product phases through POS
+are recorded below; older phase-specific descriptions are historical.
+
+Local/development/test documentation uses `@nestjs/swagger` 12.0.1:
+
+- Swagger UI: `http://localhost:4000/api/docs`
+- JSON: `http://localhost:4000/api/docs-json`
+- Canonical public snapshot: [docs/openapi/api-v1.json](docs/openapi/api-v1.json)
+- Exact inventory: [docs/openapi/routes.md](docs/openapi/routes.md) (185 operations)
+
+Both documentation routes and Swagger assets are disabled when `NODE_ENV` is
+`production`. The local UI is read-only; Try it out and credential persistence are
+disabled. Existing `/api/v1/*` routes, cookies, exact Origin and
+`X-CSRF-Protection: 1` checks are unchanged. The API-origin documentation UI does
+not bypass the configured frontend-origin requirement.
+
+From the root (use `npm.cmd` in PowerShell):
+
+```sh
+npm run openapi:generate
+npm run openapi:check
+npm run test --workspace api
+npm run openapi:test --workspace api
+```
+
+Generation/check build the API and derive DTO and response metadata from source;
+they do not construct Nest or listen, and require no PostgreSQL, Redis, or network.
+Generation writes the snapshot and inventory. Check never overwrites them and
+fails on drift, missing/duplicate operation IDs, unresolved references, missing
+path parameters, empty request schemas or transport implementation leakage.
+Runtime docs setup and `openapi:test` separately verify registered route/guard
+coverage, local UI/JSON/assets and production absence using temporary loopback
+HTTP listeners, then close them.
+
+The build-time metadata file under `apps/api/src/openapi` is ignored and regenerated
+by build/start/test hooks. Restart the development API after changing contract
+source to refresh documentation metadata. Do not edit generated metadata or the
+snapshot by hand. Intentional public changes require regeneration, diff review,
+tests and an intentional snapshot update. See the
+[contract policy](docs/architecture/backend-architecture.md#a04-public-contract-foundation).
+The type-only `packages/contracts` foundation has no runtime/framework dependencies.
+Generated Next.js/React Native clients and Gateway ownership remain future work.
+
+Implementation follows the [Nest Swagger document API](https://docs.nestjs.com/openapi/introduction).
+
 ## Requirements and installation
 
 Node >=24 (verified 24.19.0), npm 11.17.0, and Docker with Compose for local PostgreSQL/Redis. Run from the repository root:
