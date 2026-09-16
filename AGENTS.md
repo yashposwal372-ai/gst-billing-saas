@@ -261,3 +261,11 @@ Stop after the explicitly requested task/phase. Phase 6 requires new user author
 - Never fake government integrations, IRNs, government E-Way Bill numbers, or official GST return filing. Such claims require a real authorized integration. Clearly label mock/demo data.
 - Run appropriate validation before declaring success; report missing commands, failures, warnings and untested services honestly.
 - Never run npm audit fix --force or destructive dependency upgrades. Do not run writing format scripts during read-only audits.
+
+## Architecture track A07 internal Party boundary: 2026-09-16
+
+- A07 starts from published A06 checkpoint `7abb04d0f9fb97eaa88ddec94d88c74ec0bba95c`. It creates an internal `apps/api/src/party` Clean Architecture boundary for Customers and Suppliers inside the existing NestJS modular monolith.
+- Public `/customers` and `/suppliers` routes, DTO validation, response shapes, tenant scoping, owner authorization, active/deactivate semantics, opening balance Decimal behavior, GSTIN/PAN format-only checks, code allocation and uniqueness behavior remain compatible.
+- Existing customer/supplier controllers remain compatibility presentation adapters. Legacy `CustomersService` and `SuppliersService` are thin delegators to Party application use cases; authoritative Customer/Supplier logic is in Party application/infrastructure, not duplicated.
+- Party domain/application code is framework-neutral and does not import NestJS, Prisma, infrastructure or presentation. Prisma adapters implement repository ports against the existing Customer and Supplier tables. The architecture guard now checks the migrated Party scope.
+- No Prisma schema change, migration, frontend cutover, Gateway internal-context authorization, physical `party-service`, service-owned database, Redis cache, Kafka, outbox or inbox is introduced. A08 party-service extraction remains future work and requires explicit authorization.

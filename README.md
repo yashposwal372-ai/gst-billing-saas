@@ -323,3 +323,9 @@ npm audit reports 9 packages: 2 low, 1 moderate, 6 high. Production-only audit r
 npm also warns of unapproved dependency lifecycle scripts for Prisma, its engines, and optional msgpackr-extract. Generation/build/tests work in this environment; no blanket script approval was added. Vitest reports the existing vite-tsconfig-paths native-support warning.
 
 Phase 6 implementation and feasible validation are complete with the runtime limitations above. Phase 7 (Sales + Purchases) has not started and requires separate authorization.
+
+## A07 internal Party boundary (working state)
+
+A07 introduces an internal Party Clean Architecture boundary for Customers and Suppliers inside the existing NestJS monolith. Public `/customers` and `/suppliers` routes remain compatible, and no frontend URL, Prisma schema, migration, physical microservice, Kafka, outbox/inbox or Gateway cutover is introduced.
+
+The boundary lives under `apps/api/src/party` with framework-neutral domain/application types, repository ports, Prisma infrastructure adapters and compatibility presentation through the existing customer/supplier controllers. Future A08 extraction notes are documented in `docs/architecture/party-service-extraction.md`.

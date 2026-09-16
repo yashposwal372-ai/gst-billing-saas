@@ -3,7 +3,7 @@ import { extname, join, relative, sep } from 'node:path';
 
 const sourceRoot = new URL('../src/', import.meta.url);
 const repoRoot = new URL('../../../', import.meta.url);
-const checkedRoots = ['platform'];
+const checkedRoots = ['platform', 'party'];
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.mjs']);
 
 const importPattern = /(?:import|export)\s+(?:type\s+)?(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]|import\(['"]([^'"]+)['"]\)/g;

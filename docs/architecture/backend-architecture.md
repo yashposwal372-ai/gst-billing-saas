@@ -377,3 +377,15 @@ The internal context is produced by the framework-neutral `packages/security-con
 Trusted transport uses exactly `X-GST-Internal-Context` and `X-GST-Internal-Signature`. A05's reserved header stripping remains in force for public client input: `x-gst-internal-*` and `x-internal-*` are removed before any new trusted gateway-generated headers are attached. Future extracted services can use `packages/security-context` to verify signature, version, source, audience, expiry, future skew, payload size and request/correlation binding without importing NestJS, Prisma, Redis or business modules.
 
 A06 does not cut the frontend over to the gateway, does not make the gateway an authorization authority, does not query PostgreSQL or Redis, does not add Kafka/outbox/inbox and does not extract a physical business service. A07 — Internal Party Clean Architecture Boundary is next and requires explicit authorization.
+
+## A07 internal Party Clean Architecture boundary (working state)
+
+A07 keeps Customer and Supplier behavior inside the existing `apps/api` NestJS modular monolith while introducing an explicit internal Party boundary under `apps/api/src/party`.
+
+The new boundary is organized as domain, application, infrastructure and presentation. Domain and application code use framework-neutral Party actor, command, query and result types. Infrastructure implements Customer and Supplier repository ports with the existing Prisma Customer and Supplier tables. The existing `/customers` and `/suppliers` controllers remain route-compatible presentation adapters through thin legacy service delegators, so public routes, DTO validation, response shapes, frontend URLs and business semantics stay unchanged.
+
+No Prisma schema change or migration is part of A07. Customer and Supplier code generation, tenant scoping, active/deactivate flags, GSTIN/PAN format-only validation, opening balance Decimal handling, list/search/filter/sort/pagination, uniqueness handling and summary behavior are preserved. The monolith's existing auth/session/CSRF/current-business owner checks remain authoritative; A06 Gateway signed context is not consumed inside the monolith for A07.
+
+The architecture guard now includes the migrated `party` scope while still excluding unrelated legacy folders until they migrate. `docs/architecture/party-service-extraction.md` records A08 extraction considerations for references from invoices, sales/purchase documents, finance, POS, dashboard and GST reports. A07 does not create `apps/party-service`, service-owned Prisma schema, internal HTTP calls, Kafka, outbox/inbox, Redis cache, frontend gateway cutover or any physical microservice.
+
+A08 - party-service extraction remains future work and requires explicit authorization.
