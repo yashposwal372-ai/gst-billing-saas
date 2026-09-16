@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import type { SafeUser } from '../users/user.select.js';
 import type { BusinessDto } from './dto/business.dto.js';
 import { validateBusiness } from './business.validation.js';

@@ -4,7 +4,7 @@ import {
   type Product,
   type Category,
   type StockMovement,
-} from '../generated/prisma/client.js';
+} from '@gst/prisma-client/client';
 import type { CreateProductDto } from './catalogue.dto.js';
 import { required } from '../parties/party.data.js';
 export function productData(dto: CreateProductDto) {

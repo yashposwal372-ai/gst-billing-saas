@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import { validatePartyState } from '../../parties/party-address.js';
 import { defined, editable, listWhere, ownerScope, partyData, partyListSelect, rethrowParty, required, requireOwner, serialize } from '../../parties/party.data.js';
 import type { SafeUser } from '../../users/user.select.js';

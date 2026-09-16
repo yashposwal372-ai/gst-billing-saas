@@ -3,7 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import type { SafeUser } from '../users/user.select.js';
 import type { PartyDto, PartyQuery } from './party.dto.js';
 import { validatePartyState } from './party-address.js';

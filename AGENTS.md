@@ -8,9 +8,8 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Backend: modular NestJS + TypeScript REST API in apps/api. NestJS owns core business logic and database access. Do not move business logic into Next.js API routes or Server Actions.
 - PostgreSQL is the source of truth, accessed through Prisma only in NestJS. Next.js must never connect directly to PostgreSQL.
 - Redis supports cache infrastructure; BullMQ uses Redis for future background work. Avoid unnecessary distributed microservices.
-- Docker Compose supplies local services. Turborepo and npm workspaces (apps/*, packages/*) orchestrate the monorepo.
+- Docker Compose supplies local services. Turborepo and npm workspaces (apps/_, packages/_) orchestrate the monorepo.
 - Local URLs: frontend http://localhost:3000; backend http://localhost:4000/api/v1; health http://localhost:4000/api/v1/health.
-
 
 ## Architecture track A03 foundation: 2026-09-11
 
@@ -65,7 +64,6 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Final Phase 8 completion work on 2026-09-09 corrected receivable/payable status filtering so filtered totals and totalPages describe the derived settlement result set before response pagination. Invoice and purchase bill detail views now show backend-derived payment status, paid amount, outstanding/payable amount, payment history and safe Record payment links. Finance UI now uses bounded recorded-account and open-document selectors with allocation rows, payment detail, account detail/edit/ledger routes, expense detail/edit routes and transfer detail routes. Prompt/confirm lifecycle actions were replaced with shared accessible modal dialogs for payment post/reverse, expense post/cancel, transfer reversal and account deactivate/reactivate. Fixture-backed Phase 8 browser smoke passed outside the sandbox at 1440/1024/768/375 for finance routes and full customer receipt create/post/reverse, supplier payment create/post/reverse, expense create/edit/post/cancel, transfer create/post/reverse, account deactivate/reactivate and dialog Escape/Tab focus behavior. PostgreSQL opt-in tests are executable but remain skipped locally without TEST_DATABASE_URL.
 - Phase 9 GST Reports requires explicit new authorization.
 
-
 ## Phase 10 POS Billing working state: 2026-09-11
 
 - Started from approved Phase 9 checkpoint f0fd2e513f0f033abe8029fc0999e37b36dbcec5. No Phase 11 work, commit, push, reset, destructive Prisma operation, Docker/PostgreSQL/Redis installation or forced audit fix was performed.
@@ -91,6 +89,7 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - No database schema change was required for Phase 9. Existing indexes cover business/status/date and document type/status/date lookup patterns for the implemented reports. Migration: NOT REQUIRED.
 - API GST report HTTP tests cover finalized-only sources, purchase-bill-only purchase reporting, operational returns separation, date/FY validation, tenant guard path through AuthGuard/OWNER lookup, unknown businessId rejection and CSV injection safety. Browser smoke harness support for --gst-reports was added, but outside-sandbox Chrome execution was blocked by automatic approval review despite Phase 9 authorization. Real PostgreSQL/Redis remain unavailable locally.
 - Phase 10 POS Billing requires explicit new authorization.
+
 ## Verified Phase 7 implementation: 2026-09-09
 
 - Continued from approved Phase 6 checkpoint 7d5cf9a8982afccbf1ccb88bf73477a19d48be9d. No commit, push, reset, cleanup or Phase 8 work was performed.
@@ -106,6 +105,7 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - Dashboard purchase metric now uses finalized Purchase Bill documents. Supplier detail now reports finalized purchase bill total and count. Payment, payable settlement, receivable settlement, expenses, ledgers and GST reports remain unavailable.
 - Migration 20260909120000_phase7_sales_purchases was generated offline and inspected: document enums/tables/indices/FKs, supplier composite tenant key, StockMovement document link and movement type additions only. Migration application NOT RUN; no database reset.
 - API Phase 7 HTTP tests use database doubles for authenticated preview/lifecycle/conversion/stock/return behavior and do not prove real PostgreSQL transaction/concurrency behavior. Fixture-backed Phase 7 browser smoke passed outside the sandbox at 1440/1024/768/375, including sales/purchase document routes, supported conversions, lifecycle dialogs, sanitized error/retry, stock/return UI states and print DOM checks. Local PostgreSQL localhost:5432 and Redis localhost:6379 remain unavailable. Docker was not installed. Read-only npm audit remained blocked by automatic approval review; manual user approval is required. Phase 8 requires explicit new authorization.
+
 ## Verified Phase 6 implementation: 2026-09-08
 
 - Started from approved clean Phase 5 checkpoint 8c6a45a7e308f7ebc266f9bc2e58301c8fa7241d. No commit, push, reset, cleanup or Phase 7 work was performed in this continuation.
@@ -269,3 +269,15 @@ Stop after the explicitly requested task/phase. Phase 6 requires new user author
 - Existing customer/supplier controllers remain compatibility presentation adapters. Legacy `CustomersService` and `SuppliersService` are thin delegators to Party application use cases; authoritative Customer/Supplier logic is in Party application/infrastructure, not duplicated.
 - Party domain/application code is framework-neutral and does not import NestJS, Prisma, infrastructure or presentation. Prisma adapters implement repository ports against the existing Customer and Supplier tables. The architecture guard now checks the migrated Party scope.
 - No Prisma schema change, migration, frontend cutover, Gateway internal-context authorization, physical `party-service`, service-owned database, Redis cache, Kafka, outbox or inbox is introduced. A08 party-service extraction remains future work and requires explicit authorization.
+
+## Architecture track A08 party-service extraction: 2026-09-16
+
+- A08 starts from published A07 checkpoint `b7b954cfc94aa37bd6702445d4fceb1e3b74caaf` and adds `apps/party-service` as the first physical business microservice on default local port `4200`.
+- Public `/api/v1/customers` and `/api/v1/suppliers` routes remain in `apps/api` as compatibility adapters. Frontend and API Gateway routing are not cut over; Gateway still proxies public `/api/v1/*` to the monolith.
+- The monolith remains public auth/session/CSRF and tenant-resolution authority. It signs monolith-to-party contexts with `PARTY_SERVICE_HMAC_SECRET`, `source=api-monolith`, `audience=party-service`, user/session IDs, businessId, requestId/correlationId and short expiry.
+- Party-service internal routes live under `/internal/v1/party/customers` and `/internal/v1/party/suppliers`. They require `X-GST-Internal-Context` and `X-GST-Internal-Signature`, reject Gateway A06 contexts directly, reject missing businessId/wrong source/wrong audience/wrong secret/binding mismatches, and do not read public JWT cookies.
+- Customer/Supplier production write authority moves to party-service. The monolith `PartyModule` wires the HTTP Party client only; local Prisma Party repositories are not production-wired. The client has no automatic retry policy and maps transport failure to safe service-unavailable behavior.
+- A08 uses transitional shared PostgreSQL with the canonical Prisma schema still in `apps/api/prisma/schema.prisma`. The generated client now lives in shared `@gst/prisma-client`. No schema semantic change, migration, DB-per-service split, Kafka, outbox/inbox, Redis cache or extra physical business service was introduced.
+- Remaining direct Party reads from invoices/documents/finance/POS/reports/dashboard are transitional shared-DB read coupling and are documented in `docs/architecture/backend-architecture.md`.
+- Verified so far: root lint/typecheck/build PASS, API unit 191 passed, API HTTP/E2E 217 passed and 16 skipped, party-service tests 11 passed, security-context tests 6 passed, gateway check PASS, party-service check PASS, OpenAPI regenerated/checked at 185 operations; fresh isolated npm ci reproducibility passed. PostgreSQL/Redis runtime services remain unavailable locally unless later verified.
+- Do not start A09 or Phase 11 without explicit authorization.

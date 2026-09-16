@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 
 export type PriceMode = 'EXCLUSIVE' | 'INCLUSIVE';
 export type DiscountType = 'NONE' | 'PERCENT' | 'AMOUNT';

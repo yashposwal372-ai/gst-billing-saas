@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
-import { $Enums, Prisma } from '../generated/prisma/client.js';
+import { $Enums, Prisma } from '@gst/prisma-client/client';
 import type { SafeUser } from '../users/user.select.js';
 import { ownerScope, requireOwner } from '../parties/party.data.js';
 import { validatePartyState } from '../parties/party-address.js';

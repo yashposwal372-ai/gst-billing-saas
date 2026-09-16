@@ -86,18 +86,18 @@ These are target services only. They do not currently exist physically.
 
 ## Service ownership
 
-| Future owner | Current/future data |
-| --- | --- |
-| Auth | `User`, `AuthSession`, `RefreshToken`, `PasswordResetToken`, `EmailVerificationToken` |
-| Business | `Business`, `BusinessMember` |
-| Party | `Customer`, `Supplier` |
-| Catalogue | `Category`, `Product` master data |
-| Inventory | `StockMovement`, future `InventoryBalance` |
-| Billing | `Invoice`, `InvoiceLine`, `InvoiceSequence`, GST calculator, invoice snapshots and lifecycle |
-| Sales/Purchase | `BusinessDocument*` during staged split; later sales and purchase ownership by document type |
-| Finance | `MoneyAccount`, `MoneyAccountEntry`, `FinanceSequence`, `Payment`, `PaymentAllocation`, `ExpenseCategory`, `Expense`, `AccountTransfer` |
-| GST reports | Future report read models |
-| POS | Checkout orchestration and future held-cart/session/idempotency data |
+| Future owner   | Current/future data                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth           | `User`, `AuthSession`, `RefreshToken`, `PasswordResetToken`, `EmailVerificationToken`                                                   |
+| Business       | `Business`, `BusinessMember`                                                                                                            |
+| Party          | `Customer`, `Supplier`                                                                                                                  |
+| Catalogue      | `Category`, `Product` master data                                                                                                       |
+| Inventory      | `StockMovement`, future `InventoryBalance`                                                                                              |
+| Billing        | `Invoice`, `InvoiceLine`, `InvoiceSequence`, GST calculator, invoice snapshots and lifecycle                                            |
+| Sales/Purchase | `BusinessDocument*` during staged split; later sales and purchase ownership by document type                                            |
+| Finance        | `MoneyAccount`, `MoneyAccountEntry`, `FinanceSequence`, `Payment`, `PaymentAllocation`, `ExpenseCategory`, `Expense`, `AccountTransfer` |
+| GST reports    | Future report read models                                                                                                               |
+| POS            | Checkout orchestration and future held-cart/session/idempotency data                                                                    |
 
 Prisma ownership is documented only in A03. No Prisma model ownership is physically changed.
 
@@ -334,7 +334,6 @@ in A04. Internal `/internal/v1/*` contracts will be separate and are not publish
 in this public snapshot. Party remains the first later physical extraction after
 A04â€“A07 prerequisites.
 
-
 ## A05 API Gateway foundation
 
 A05 introduces `apps/api-gateway` as a parallel public-edge NestJS TypeScript application. The current runtime topology is:
@@ -360,6 +359,7 @@ Header policy at the public edge:
 `npm run gateway:check` validates that the 185-operation A04 OpenAPI contract is covered by the `/api/v1` proxy rule, checks config and header policies, and rejects gateway imports from `apps/api` implementation source. Gateway fixture tests cover GET/POST, raw bodies, encoded paths, repeated query keys, cookies, multiple `Set-Cookie`, CSRF/Origin forwarding, ID handling, internal header stripping, upstream 5xx pass-through, unavailable/timeout errors, no retries and health.
 
 A06 ï¿½ Identity + Security Propagation is next. It requires explicit authorization and has not started.
+
 ## A06 next
 
 A06 ï¿½ Identity + Security Propagation requires explicit authorization. It has not started.
@@ -376,7 +376,7 @@ The internal context is produced by the framework-neutral `packages/security-con
 
 Trusted transport uses exactly `X-GST-Internal-Context` and `X-GST-Internal-Signature`. A05's reserved header stripping remains in force for public client input: `x-gst-internal-*` and `x-internal-*` are removed before any new trusted gateway-generated headers are attached. Future extracted services can use `packages/security-context` to verify signature, version, source, audience, expiry, future skew, payload size and request/correlation binding without importing NestJS, Prisma, Redis or business modules.
 
-A06 does not cut the frontend over to the gateway, does not make the gateway an authorization authority, does not query PostgreSQL or Redis, does not add Kafka/outbox/inbox and does not extract a physical business service. A07 — Internal Party Clean Architecture Boundary is next and requires explicit authorization.
+A06 does not cut the frontend over to the gateway, does not make the gateway an authorization authority, does not query PostgreSQL or Redis, does not add Kafka/outbox/inbox and does not extract a physical business service. A07 ï¿½ Internal Party Clean Architecture Boundary is next and requires explicit authorization.
 
 ## A07 internal Party Clean Architecture boundary (working state)
 
@@ -389,3 +389,15 @@ No Prisma schema change or migration is part of A07. Customer and Supplier code 
 The architecture guard now includes the migrated `party` scope while still excluding unrelated legacy folders until they migrate. `docs/architecture/party-service-extraction.md` records A08 extraction considerations for references from invoices, sales/purchase documents, finance, POS, dashboard and GST reports. A07 does not create `apps/party-service`, service-owned Prisma schema, internal HTTP calls, Kafka, outbox/inbox, Redis cache, frontend gateway cutover or any physical microservice.
 
 A08 - party-service extraction remains future work and requires explicit authorization.
+
+## A08 first physical business microservice: party-service
+
+A08 physically separates Customer and Supplier runtime execution into `apps/party-service` while preserving the public monolith API as the compatibility surface. The current topology is browser/client -> public `apps/api` controllers -> signed internal HTTP -> `apps/party-service` -> existing PostgreSQL Customer/Supplier tables.
+
+Trust boundary: `apps/api` continues to authenticate the public session and resolve the current OWNER business. Only after that resolution does it sign a service-specific context with `PARTY_SERVICE_HMAC_SECRET`. Party-service requires `source=api-monolith`, `audience=party-service`, `userId`, `businessId`, `requestId`, `correlationId`, `issuedAt` and `expiresAt`, bound to `X-Request-ID` and `X-Correlation-ID`. Gateway A06 contexts remain `source=api-gateway`, `audience=gst-internal-services` and are not accepted by party-service.
+
+Write ownership: production Customer/Supplier writes flow through party-service internal routes under `/internal/v1/party/*`. The monolith `PartyModule` wires the remote `HttpPartyServiceClient` and does not wire local Prisma Party repositories in production. The client uses zero automatic retries; timeouts or transport failures map to safe public service-unavailable responses without exposing internal URLs, stack traces or secret headers.
+
+Database stage: A08 deliberately remains a shared PostgreSQL transition. `@gst/prisma-client` hosts the generated Prisma client from the canonical `apps/api/prisma/schema.prisma` so both runtimes can compile against one schema without duplicating schema ownership. No Prisma migration or DB-per-service split is introduced.
+
+Remaining transitional read coupling: invoices, business documents, finance/payments, POS, GST reports and dashboards may still read Customer/Supplier rows through the shared database for projections, snapshots and metrics. These reads are documented as transitional shared-DB coupling. A08 does not add distributed transactions, Kafka, outbox/inbox or direct gateway routing to party-service.

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import type { SafeUser } from '../users/user.select.js';
 import { ownerScope, requireOwner } from '../parties/party.data.js';
 import { dateOnly, money } from '../invoices/invoice-calculator.js';

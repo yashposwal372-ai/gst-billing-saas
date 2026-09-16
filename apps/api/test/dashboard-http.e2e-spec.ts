@@ -5,7 +5,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { DatabaseService } from '../src/database/database.service.js';
 import { TokenService } from '../src/auth/token.service.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 
 describe('dashboard HTTP (database double, real auth guard)', () => {
   let app: INestApplication;

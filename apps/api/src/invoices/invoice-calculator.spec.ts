@@ -1,4 +1,4 @@
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import { financialYear, InvoiceCalculator, money } from './invoice-calculator.js';
 
 const D = Prisma.Decimal;

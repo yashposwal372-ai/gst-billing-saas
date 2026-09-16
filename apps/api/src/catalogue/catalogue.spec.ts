@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
-import { Prisma, type Product } from '../generated/prisma/client.js';
+import { Prisma, type Product } from '@gst/prisma-client/client';
 import {
   CreateProductDto,
   ProductDto,

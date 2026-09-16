@@ -3,7 +3,7 @@ import { DatabaseService } from '../database/database.service.js';
 import type { SafeUser } from '../users/user.select.js';
 import { ownerScope } from '../parties/party.data.js';
 import { dashboardFilter, type DashboardQuery } from './dashboard.query.js';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 
 @Injectable()
 export class DashboardService {

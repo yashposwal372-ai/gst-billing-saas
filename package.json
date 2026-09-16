@@ -15,7 +15,11 @@
     "gateway:build": "npm run build --workspace api-gateway",
     "gateway:test": "npm run test --workspace api-gateway",
     "gateway:check": "npm run check --workspace api-gateway",
-    "security-context:test": "npm run test --workspace @gst/security-context"
+    "security-context:test": "npm run test --workspace @gst/security-context",
+    "party-service:dev": "npm run start:dev --workspace party-service",
+    "party-service:build": "npm run build --workspace party-service",
+    "party-service:test": "npm run test --workspace party-service",
+    "party-service:check": "npm run check --workspace party-service"
   },
   "devDependencies": {
     "prettier": "3.9.6",
@@ -23,7 +27,7 @@
     "typescript": "7.0.2"
   },
   "engines": {
-    "node": ">=24"
+    "node": "\u003e=24"
   },
   "devEngines": {
     "packageManager": {

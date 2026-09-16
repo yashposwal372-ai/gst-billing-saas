@@ -7,7 +7,7 @@ import { DatabaseService } from '../src/database/database.service.js';
 import { TokenService } from '../src/auth/token.service.js';
 import { InvoicesService } from '../src/invoices/invoices.service.js';
 import { FinanceService } from '../src/finance/finance.service.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 
 const D = Prisma.Decimal;
 const user = { id: '11111111-1111-4111-8111-111111111111', currentBusinessId: '22222222-2222-4222-8222-222222222222', status: 'ACTIVE', authVersion: 0 };

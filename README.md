@@ -63,7 +63,6 @@ Generated Next.js/React Native clients and Gateway ownership remain future work.
 
 Implementation follows the [Nest Swagger document API](https://docs.nestjs.com/openapi/introduction).
 
-
 ## A05 API Gateway foundation (2026-09-14)
 
 `apps/api-gateway` is a parallel NestJS TypeScript public-edge foundation for the future Strangler migration. It does not replace the current backend yet, and the frontend has not been cut over. The current business API remains `apps/api` on `http://localhost:4000/api/v1`; the gateway defaults to `http://localhost:4100` and generically proxies only `/api/v1` and `/api/v1/*` to the trusted `MONOLITH_BASE_URL`.
@@ -92,6 +91,7 @@ npm run gateway:build
 ```
 
 A05 does not create physical business services, Kafka, outbox/inbox, Prisma schema changes or migrations. A06 will design identity and security propagation.
+
 ## A06 identity and security propagation (2026-09-16)
 
 The gateway now performs stateless verification of the current access JWT only to create a short-lived trusted internal identity context for future downstream services. Current access tokens are `jose` JWTs signed with HS256, issuer `gst-billing-api`, audience `gst-billing-web`, subject `sub` as the user ID, and `sid` as the session ID. The current symmetric `JWT_SECRET` must be shared with the gateway for verification during this migration stage; the gateway does not mint, refresh, revoke or log access tokens. Future asymmetric verification is preferable before wider service extraction.
@@ -99,6 +99,7 @@ The gateway now performs stateless verification of the current access JWT only t
 When a valid access cookie is present, the gateway signs a compact context using HMAC-SHA-256 and forwards it in `X-GST-Internal-Context` and `X-GST-Internal-Signature`. The context is base64url encoded, versioned, has source `api-gateway`, audience `gst-internal-services`, includes request/correlation IDs, user ID and session ID, and expires after at most 60 seconds. It never contains raw JWTs, refresh tokens, cookies, email, phone, GSTIN, PAN, bank data or business/customer data. Public `x-gst-internal-*` and `x-internal-*` headers remain stripped before new trusted headers are generated.
 
 Compatibility is unchanged for public `/api/v1` traffic. Missing, expired, malformed or wrongly signed access cookies do not produce internal identity headers, but the request still proxies normally so the monolith remains the current authentication, CSRF, session validity, business membership, tenant authorization and resource authorization authority. Refresh cookies alone never establish gateway identity. No database or Redis lookup is performed by the gateway, and no frontend cutover, physical service extraction, Kafka, outbox/inbox, Prisma schema change or migration is introduced.
+
 ## Requirements and installation
 
 Node >=24 (verified 24.19.0), npm 11.17.0, and Docker with Compose for local PostgreSQL/Redis. Run from the repository root:
@@ -158,7 +159,6 @@ git diff --check
 
 Tailwind 4 uses @tailwindcss/postcss and CSS imports; existing App Router/CSS modules remain. Zod validates frontend API configuration. No frontend form/test framework was added.
 
-
 ## Phase 10 POS billing (2026-09-11)
 
 Phase 10 adds a focused authenticated POS route at `/pos`, POS sales history at `/pos/sales`, and an 80mm receipt print route at `/pos/receipt/:invoiceId`. POS is a retail workflow over existing domains: completed sales are normal finalized Invoice records with `salesChannel = POS`; GST uses the existing invoice calculator; stock movements remain the existing invoice finalization movements; recorded payments use Phase 8 customer receipt/payment allocation and MoneyAccount ledger behavior. No separate POS financial record, payment gateway, UPI processing, camera scanning, warehouse, or offline sync is implemented.
@@ -176,6 +176,7 @@ Backend endpoints under `/api/v1/gst-reports` include summary, sales register, p
 Frontend routes under `/gst-reports` provide report summary cards, filters, printable report views, CSV export links and drill-down links to invoice or purchase bill detail pages. Use Purchase GST Recorded / Purchase Tax Recorded wording; do not present purchase totals as ITC eligibility or claimable tax.
 
 No Phase 9 database migration was required. Existing Phase 6/7 snapshot columns and indexes support the implemented reporting views. Browser smoke support exists through `node apps/web/scripts/dashboard-smoke.mjs --gst-reports`, but local outside-sandbox Chrome execution was blocked by automatic approval review unless explicitly approved.
+
 ## Phase 8 payments, expenses and banking (2026-09-09)
 
 Phase 8 is bookkeeping and settlement recording only. It does not move money, verify bank balances, synchronize bank feeds, process cards/UPI, clear cheques, integrate with RBI/NPCI, or perform automatic reconciliation. Account balances are internal ledger balances and may be negative because the app records business activity rather than authorizing external funds.
@@ -238,16 +239,16 @@ Frontend routes: `/products`, `/products/new`, `/products/:id`, `/products/:id/e
 
 All API paths below are relative to `/api/v1` and require the authenticated user's current OWNER business. Writes retain Origin/CSRF checks. Unknown DTO/query properties, including client business IDs and product codes, are rejected.
 
-| Methods | Path | Behavior |
-| --- | --- | --- |
-| GET, POST | `/categories` | Paginated list / create |
-| GET, PATCH, DELETE | `/categories/:id` | Detail / partial edit / deactivate |
-| GET, POST | `/products` | Paginated catalogue / create PRODUCT or SERVICE |
-| GET, PATCH, DELETE | `/products/:id` | Detail / partial edit / deactivate |
-| GET | `/products/by-barcode/:barcode` | Exact business-scoped barcode lookup |
-| GET | `/inventory/summary` | Active product, tracked, low-stock and out-of-stock counts |
-| POST | `/products/:id/stock-adjustments` | Transactional stock increase/decrease |
-| GET | `/products/:id/stock-movements` | Immutable paginated history |
+| Methods            | Path                              | Behavior                                                   |
+| ------------------ | --------------------------------- | ---------------------------------------------------------- |
+| GET, POST          | `/categories`                     | Paginated list / create                                    |
+| GET, PATCH, DELETE | `/categories/:id`                 | Detail / partial edit / deactivate                         |
+| GET, POST          | `/products`                       | Paginated catalogue / create PRODUCT or SERVICE            |
+| GET, PATCH, DELETE | `/products/:id`                   | Detail / partial edit / deactivate                         |
+| GET                | `/products/by-barcode/:barcode`   | Exact business-scoped barcode lookup                       |
+| GET                | `/inventory/summary`              | Active product, tracked, low-stock and out-of-stock counts |
+| POST               | `/products/:id/stock-adjustments` | Transactional stock increase/decrease                      |
+| GET                | `/products/:id/stock-movements`   | Immutable paginated history                                |
 
 PATCH `{"isActive":true}` reactivates categories/items; DELETE never physically deletes them. Product lists accept `page`, `pageSize` (default 20, max 100), `search`, `status=active|inactive|all`, `type=PRODUCT|SERVICE`, `categoryId`, `gstRate`, `stockStatus=all|tracked|low|out`, `sortBy=name|productCode|createdAt|salePrice|currentStock` and `sortOrder=asc|desc`. Category lists accept pagination, status and search. Movement lists accept pagination and optional `type=OPENING|ADJUSTMENT_IN|ADJUSTMENT_OUT`.
 
@@ -273,13 +274,13 @@ Frontend routes: `/invoices`, `/invoices/new`, `/invoices/:id`, `/invoices/:id/e
 
 All invoice API paths are under `/api/v1`, require the authenticated user's current OWNER business, and keep the existing Origin/CSRF protections on writes. Unknown DTO/query fields are rejected, including client-submitted totals.
 
-| Methods | Path | Behavior |
-| --- | --- | --- |
-| GET, POST | `/invoices` | Paginated list / create draft |
-| POST | `/invoices/preview` | Server-calculated draft preview without persistence |
-| GET, PATCH, DELETE | `/invoices/:id` | Detail / edit draft / discard draft |
-| POST | `/invoices/:id/finalize` | Assign permanent invoice number and deduct stock |
-| POST | `/invoices/:id/cancel` | Cancel finalized invoice and restore stock |
+| Methods            | Path                     | Behavior                                            |
+| ------------------ | ------------------------ | --------------------------------------------------- |
+| GET, POST          | `/invoices`              | Paginated list / create draft                       |
+| POST               | `/invoices/preview`      | Server-calculated draft preview without persistence |
+| GET, PATCH, DELETE | `/invoices/:id`          | Detail / edit draft / discard draft                 |
+| POST               | `/invoices/:id/finalize` | Assign permanent invoice number and deduct stock    |
+| POST               | `/invoices/:id/cancel`   | Cancel finalized invoice and restore stock          |
 
 Draft invoices have no permanent invoice number and do not affect stock. Finalization assigns a server-generated number such as `INV/2026-27/000001`, using the existing business invoice prefix, an `InvoiceSequence` row scoped by business and Indian-style April-March financial year, and a Serializable transaction. Finalized invoice financial fields and snapshots are immutable through the public API. Cancellation preserves the invoice number and totals, records reason/date/actor and restores stock exactly once.
 
@@ -312,6 +313,7 @@ Seller, customer, supplier and product details are snapshotted into document row
 Migration `20260909120000_phase7_sales_purchases` was generated offline and inspected. It adds business document enums, sequence/table/line records, scoped indexes/foreign keys, supplier composite tenant key, and document-linked stock movement types. **Migration application: NOT RUN.** Use the existing deploy command only against a configured PostgreSQL database when available; never reset for validation.
 
 Validation in this environment: API Phase 7 HTTP double coverage was added for preview/create/lifecycle/conversion/stock/return safety. Root lint, typecheck, build, API unit, API HTTP/e2e, Prisma format/validate/generate and git diff checks passed. Fixture-backed Phase 7 browser smoke passed outside the sandbox at 1440/1024/768/375 for document routes, conversions, lifecycle dialogs, responsive layout and print DOM checks. npm audit remained blocked by automatic approval review after a read-only registry attempt; manual user approval is required. Local PostgreSQL and Redis remain unavailable, so live persistence/concurrency/cache verification is not claimed.
+
 ## Infrastructure and dependency limitations
 
 Phase 1 previously verified root dev serving on ports 3000 and 4000; watch restart was not verified. Phase 2 runtime checks used compiled servers.
@@ -329,3 +331,13 @@ Phase 6 implementation and feasible validation are complete with the runtime lim
 A07 introduces an internal Party Clean Architecture boundary for Customers and Suppliers inside the existing NestJS monolith. Public `/customers` and `/suppliers` routes remain compatible, and no frontend URL, Prisma schema, migration, physical microservice, Kafka, outbox/inbox or Gateway cutover is introduced.
 
 The boundary lives under `apps/api/src/party` with framework-neutral domain/application types, repository ports, Prisma infrastructure adapters and compatibility presentation through the existing customer/supplier controllers. Future A08 extraction notes are documented in `docs/architecture/party-service-extraction.md`.
+
+## A08 party-service physical extraction
+
+A08 introduces `apps/party-service` as the first physical business microservice. Public browser traffic still uses the existing public API routes through `apps/api`; `/api/v1/customers` and `/api/v1/suppliers` remain compatibility controllers in the monolith. Those controllers delegate to party-service over internal HTTP using `PARTY_SERVICE_BASE_URL` and `PARTY_SERVICE_TIMEOUT_MS`.
+
+Local ports are now: web `3000`, API monolith `4000`, API gateway `4100`, and party-service `4200`. The API gateway still proxies public `/api/v1/*` traffic to the monolith and does not route Party directly.
+
+The monolith remains responsible for public authentication, browser CSRF behavior and tenant/business resolution. It signs a short-lived service context with `PARTY_SERVICE_HMAC_SECRET` using source `api-monolith` and audience `party-service`. Party-service trusts only `X-GST-Internal-Context` plus `X-GST-Internal-Signature`; it does not read public JWT cookies and does not accept a body/query `businessId` as tenant authority.
+
+Party-service uses the same PostgreSQL database and canonical Prisma schema as a transitional shared-database stage. The generated Prisma client is shared through `@gst/prisma-client`; no migration, DB-per-service split, Kafka, outbox, Redis cache or frontend cutover is part of A08.

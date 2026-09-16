@@ -1,4 +1,4 @@
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Prisma } from '@gst/prisma-client/client';
 
 export const safeUserSelect = {
   id: true, email: true, firstName: true, lastName: true, mobile: true,

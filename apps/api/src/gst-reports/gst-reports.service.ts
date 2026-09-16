@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import { DatabaseService } from '../database/database.service.js';
 import type { SafeUser } from '../users/user.select.js';
 import { requireOwner } from '../parties/party.data.js';
@@ -35,4 +35,3 @@ export class GstReportsService {
   private scope(q:GstReportQuery){ return { financialYear:q.financialYear??null, dateFrom:q.dateFrom??null, dateTo:q.dateTo??null, note:'financialYear sets broad April-March bounds; dateFrom/dateTo further narrow the report when supplied.' }; }
   private csv(headers:string[], rows:unknown[][]){ const esc=(v:unknown)=>{ const s=String(v??''); const safe=/^[=+@]/.test(s) || (s.startsWith('-') && !/^-?\\d+(\\.\\d+)?$/.test(s)) ? `'${s}` : s; return /[",\n\r]/.test(safe)?`"${safe.replaceAll('"','""')}"`:safe; }; return '\uFEFF'+[headers, ...rows].map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n'; }
 }
-

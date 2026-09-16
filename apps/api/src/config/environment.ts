@@ -1,14 +1,6 @@
 import 'reflect-metadata';
 import { plainToInstance, Type } from 'class-transformer';
-import {
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-  validateSync,
-} from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 
 export class Environment {
   @IsIn(['development', 'test', 'production'])
@@ -24,8 +16,7 @@ export class Environment {
   FRONTEND_URL: string = 'http://localhost:3000';
 
   @IsString()
-  DATABASE_URL: string =
-    'postgresql://gst_dev:gst_dev_local@localhost:5432/gst_billing';
+  DATABASE_URL: string = 'postgresql://gst_dev:gst_dev_local@localhost:5432/gst_billing';
 
   @IsString()
   REDIS_URL: string = 'redis://localhost:6379';
@@ -37,65 +28,48 @@ export class Environment {
   @IsOptional()
   @IsString()
   JWT_REFRESH_SECRET?: string;
+
+  @IsString()
+  PARTY_SERVICE_BASE_URL: string = 'http://127.0.0.1:4200';
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(600000)
+  PARTY_SERVICE_TIMEOUT_MS: number = 10000;
+
+  @IsOptional()
+  @IsString()
+  PARTY_SERVICE_HMAC_SECRET?: string;
 }
 
-export function validateEnvironment(
-  input: Record<string, unknown>,
-): Environment {
-  const config = plainToInstance(
-    Environment,
-    Object.fromEntries(
-      Object.entries(input).filter(([key]) =>
-        Object.hasOwn(new Environment(), key),
-      ),
-    ),
-  );
+export function validateEnvironment(input: Record<string, unknown>): Environment {
+  const config = plainToInstance(Environment, Object.fromEntries(Object.entries(input).filter(([key]) => Object.hasOwn(new Environment(), key))));
   const invalid = new Set(validateSync(config).map((error) => error.property));
-  if (config.JWT_SECRET && (config.JWT_SECRET.length < 32 || /placeholder|change.me|replace/i.test(config.JWT_SECRET)))
-    invalid.add('JWT_SECRET');
+  if (config.JWT_SECRET && (config.JWT_SECRET.length < 32 || /placeholder|change.me|replace/i.test(config.JWT_SECRET))) invalid.add('JWT_SECRET');
   for (const [key, protocols] of [
     ['FRONTEND_URL', ['http:', 'https:']],
+    ['PARTY_SERVICE_BASE_URL', ['http:', 'https:']],
     ['DATABASE_URL', ['postgres:', 'postgresql:']],
     ['REDIS_URL', ['redis:', 'rediss:']],
   ] as const) {
     try {
       const url = new URL(config[key]);
-      if (
-        !(protocols as readonly string[]).includes(url.protocol) ||
-        !url.hostname
-      )
-        invalid.add(key);
-      if (
-        key === 'FRONTEND_URL' &&
-        (url.origin !== config[key] || url.username || url.password)
-      )
-        invalid.add(key);
-    } catch {
-      invalid.add(key);
-    }
+      if (!(protocols as readonly string[]).includes(url.protocol) || !url.hostname) invalid.add(key);
+      if (key === 'FRONTEND_URL' && (url.origin !== config[key] || url.username || url.password)) invalid.add(key);
+    } catch { invalid.add(key); }
   }
   if (config.NODE_ENV === 'production') {
-    for (const key of ['FRONTEND_URL', 'DATABASE_URL', 'REDIS_URL'] as const) {
-      if (!input[key] || input[key] === new Environment()[key])
-        invalid.add(key);
+    for (const key of ['FRONTEND_URL', 'DATABASE_URL', 'REDIS_URL', 'PARTY_SERVICE_BASE_URL'] as const) {
+      if (!input[key] || input[key] === new Environment()[key]) invalid.add(key);
     }
-    for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET'] as const) {
+    for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'PARTY_SERVICE_HMAC_SECRET'] as const) {
       const value = config[key];
-      if (
-        !value ||
-        value.length < 32 ||
-        /placeholder|change.me|replace/i.test(value)
-      )
-        invalid.add(key);
+      if (!value || value.length < 32 || /placeholder|change.me|replace/i.test(value)) invalid.add(key);
     }
-    if (config.JWT_SECRET === config.JWT_REFRESH_SECRET)
-      invalid.add('JWT_REFRESH_SECRET');
-    if (!config.FRONTEND_URL.startsWith('https://'))
-      invalid.add('FRONTEND_URL');
+    if (config.JWT_SECRET === config.JWT_REFRESH_SECRET) invalid.add('JWT_REFRESH_SECRET');
+    if (!config.FRONTEND_URL.startsWith('https://')) invalid.add('FRONTEND_URL');
   }
-  if (invalid.size)
-    throw new Error(
-      'Invalid environment variables: ' + [...invalid].join(', '),
-    );
+  if (invalid.size) throw new Error('Invalid environment variables: ' + [...invalid].join(', '));
   return config;
 }

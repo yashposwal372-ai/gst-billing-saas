@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 import { AuthService } from './auth.service.js';
 import { PasswordService } from './password.service.js';
 import { TokenService, newToken, tokenHash } from './token.service.js';

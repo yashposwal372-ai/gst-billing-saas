@@ -3,16 +3,21 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 export const SECURITY_CONTEXT_VERSION = 1;
 export const SECURITY_CONTEXT_SOURCE = 'api-gateway';
 export const SECURITY_CONTEXT_AUDIENCE = 'gst-internal-services';
+export const PARTY_SERVICE_CONTEXT_SOURCE = 'api-monolith';
+export const PARTY_SERVICE_CONTEXT_AUDIENCE = 'party-service';
 export const SECURITY_CONTEXT_MAX_AGE_MS = 60_000;
 export const SECURITY_CONTEXT_MAX_FUTURE_SKEW_MS = 5_000;
 export const SECURITY_CONTEXT_MAX_ENCODED_LENGTH = 2048;
 export const INTERNAL_CONTEXT_HEADER = 'X-GST-Internal-Context';
 export const INTERNAL_SIGNATURE_HEADER = 'X-GST-Internal-Signature';
 
+export type SecurityContextSource = typeof SECURITY_CONTEXT_SOURCE | typeof PARTY_SERVICE_CONTEXT_SOURCE;
+export type SecurityContextAudience = typeof SECURITY_CONTEXT_AUDIENCE | typeof PARTY_SERVICE_CONTEXT_AUDIENCE;
+
 export type SecurityContextPayload = Readonly<{
   v: typeof SECURITY_CONTEXT_VERSION;
-  source: typeof SECURITY_CONTEXT_SOURCE;
-  aud: typeof SECURITY_CONTEXT_AUDIENCE;
+  source: SecurityContextSource;
+  aud: SecurityContextAudience;
   requestId: string;
   correlationId: string;
   userId: string;
@@ -29,6 +34,8 @@ export type SignSecurityContextInput = Readonly<{
   userId: string;
   sessionId?: string;
   businessId?: string;
+  source?: SecurityContextSource;
+  audience?: SecurityContextAudience;
   nowMs?: number;
   lifetimeMs?: number;
 }>;
@@ -37,6 +44,9 @@ export type VerifySecurityContextInput = Readonly<{
   secret: string;
   encodedContext: string;
   signature: string;
+  expectedSource?: SecurityContextSource;
+  expectedAudience?: SecurityContextAudience;
+  requireBusinessId?: boolean;
   expectedRequestId?: string;
   expectedCorrelationId?: string;
   nowMs?: number;
@@ -99,6 +109,14 @@ function secureEqual(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+function isSource(value: unknown): value is SecurityContextSource {
+  return value === SECURITY_CONTEXT_SOURCE || value === PARTY_SERVICE_CONTEXT_SOURCE;
+}
+
+function isAudience(value: unknown): value is SecurityContextAudience {
+  return value === SECURITY_CONTEXT_AUDIENCE || value === PARTY_SERVICE_CONTEXT_AUDIENCE;
+}
+
 function parsePayload(encodedContext: string): SecurityContextPayload {
   if (encodedContext.length > SECURITY_CONTEXT_MAX_ENCODED_LENGTH) throw new Error('Internal context is too large');
   if (!BASE64URL.test(encodedContext)) throw new Error('Internal context is malformed');
@@ -111,8 +129,8 @@ function parsePayload(encodedContext: string): SecurityContextPayload {
   if (!parsed || typeof parsed !== 'object') throw new Error('Internal context is invalid');
   const payload = parsed as Record<string, unknown>;
   if (payload.v !== SECURITY_CONTEXT_VERSION) throw new Error('Unsupported internal context version');
-  if (payload.source !== SECURITY_CONTEXT_SOURCE) throw new Error('Unsupported internal context source');
-  if (payload.aud !== SECURITY_CONTEXT_AUDIENCE) throw new Error('Unsupported internal context audience');
+  if (!isSource(payload.source)) throw new Error('Unsupported internal context source');
+  if (!isAudience(payload.aud)) throw new Error('Unsupported internal context audience');
   for (const key of ['requestId', 'correlationId', 'userId']) {
     if (typeof payload[key] !== 'string') throw new Error(`Internal context ${key} is required`);
   }
@@ -139,8 +157,8 @@ export function signSecurityContext(input: SignSecurityContextInput): SignedSecu
   if (!Number.isInteger(lifetime) || lifetime <= 0 || lifetime > SECURITY_CONTEXT_MAX_AGE_MS) throw new Error('Internal context lifetime is invalid');
   const payload: SecurityContextPayload = {
     v: SECURITY_CONTEXT_VERSION,
-    source: SECURITY_CONTEXT_SOURCE,
-    aud: SECURITY_CONTEXT_AUDIENCE,
+    source: input.source ?? SECURITY_CONTEXT_SOURCE,
+    aud: input.audience ?? SECURITY_CONTEXT_AUDIENCE,
     requestId: input.requestId,
     correlationId: input.correlationId,
     userId: input.userId,
@@ -156,6 +174,11 @@ export function signSecurityContext(input: SignSecurityContextInput): SignedSecu
 export function verifySecurityContext(input: VerifySecurityContextInput): SecurityContextPayload {
   assertSecret(input.secret);
   const payload = parsePayload(input.encodedContext);
+  const expectedSource = input.expectedSource ?? SECURITY_CONTEXT_SOURCE;
+  const expectedAudience = input.expectedAudience ?? SECURITY_CONTEXT_AUDIENCE;
+  if (payload.source !== expectedSource) throw new Error('Unsupported internal context source');
+  if (payload.aud !== expectedAudience) throw new Error('Unsupported internal context audience');
+  if (input.requireBusinessId && !payload.businessId) throw new Error('Internal context businessId is required');
   const expectedSignature = signEncoded(input.secret, input.encodedContext);
   if (!secureEqual(input.signature, expectedSignature)) throw new Error('Internal context signature is invalid');
   const canonicalEncoded = encodePayload(payload);

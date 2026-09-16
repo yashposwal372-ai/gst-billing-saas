@@ -1,29 +1,9 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../database/database.module.js';
-import { CustomerApplicationService } from './application/customer-application.service.js';
-import { SupplierApplicationService } from './application/supplier-application.service.js';
-import { CUSTOMER_REPOSITORY, SUPPLIER_REPOSITORY, type CustomerRepositoryPort, type SupplierRepositoryPort } from './application/party-repository.port.js';
-import { PrismaCustomerRepository } from './infrastructure/prisma-customer.repository.js';
-import { PrismaSupplierRepository } from './infrastructure/prisma-supplier.repository.js';
+import { HttpPartyServiceClient } from './infrastructure/http-party-service.client.js';
+import { PARTY_CLIENT } from './application/party-client.port.js';
 
 @Module({
-  imports: [DatabaseModule],
-  providers: [
-    PrismaCustomerRepository,
-    PrismaSupplierRepository,
-    { provide: CUSTOMER_REPOSITORY, useExisting: PrismaCustomerRepository },
-    { provide: SUPPLIER_REPOSITORY, useExisting: PrismaSupplierRepository },
-    {
-      provide: CustomerApplicationService,
-      useFactory: (repository: CustomerRepositoryPort) => new CustomerApplicationService(repository),
-      inject: [CUSTOMER_REPOSITORY],
-    },
-    {
-      provide: SupplierApplicationService,
-      useFactory: (repository: SupplierRepositoryPort) => new SupplierApplicationService(repository),
-      inject: [SUPPLIER_REPOSITORY],
-    },
-  ],
-  exports: [CustomerApplicationService, SupplierApplicationService],
+  providers: [HttpPartyServiceClient, { provide: PARTY_CLIENT, useExisting: HttpPartyServiceClient }],
+  exports: [PARTY_CLIENT],
 })
 export class PartyModule {}

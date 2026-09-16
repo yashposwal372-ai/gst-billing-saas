@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../src/database/database.service.js';
 import { GstReportsService } from '../src/gst-reports/gst-reports.service.js';
 import { safeUserSelect, type SafeUser } from '../src/users/user.select.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 
 const D = Prisma.Decimal;
 const day = (value: string) => new Date(`${value}T00:00:00.000Z`);

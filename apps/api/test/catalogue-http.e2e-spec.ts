@@ -5,7 +5,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { DatabaseService } from '../src/database/database.service.js';
 import { TokenService } from '../src/auth/token.service.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
 describe('catalogue HTTP (real guards/services, database double)', () => {
   let app: INestApplication, cookie: string;
   const id = '11111111-1111-4111-8111-111111111111';

@@ -25,12 +25,12 @@ export class SuppliersController {
   @Post()
   @Header('Cache-Control', 'no-store')
   async create(@CurrentAuth() auth: AuthContext, @Body() dto: SupplierDto) {
-    return { profile: await this.service.create(auth.user, dto) };
+    return { profile: await this.service.create(auth, dto) };
   }
   @Get()
   @Header('Cache-Control', 'no-store')
   list(@CurrentAuth() auth: AuthContext, @Query() query: PartyQuery) {
-    return this.service.list(auth.user, query);
+    return this.service.list(auth, query);
   }
   @Get(':id')
   @Header('Cache-Control', 'no-store')
@@ -38,7 +38,7 @@ export class SuppliersController {
     @CurrentAuth() auth: AuthContext,
     @Param('id', new ParseUUIDPipe()) id: string,
   ) {
-    return this.service.detail(auth.user, id);
+    return this.service.detail(auth, id);
   }
   @Patch(':id')
   @Header('Cache-Control', 'no-store')
@@ -47,7 +47,7 @@ export class SuppliersController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: SupplierDto,
   ) {
-    return { profile: await this.service.update(auth.user, id, dto) };
+    return { profile: await this.service.update(auth, id, dto) };
   }
   @Delete(':id')
   @Header('Cache-Control', 'no-store')
@@ -55,6 +55,6 @@ export class SuppliersController {
     @CurrentAuth() auth: AuthContext,
     @Param('id', new ParseUUIDPipe()) id: string,
   ) {
-    return { profile: await this.service.deactivate(auth.user, id) };
+    return { profile: await this.service.deactivate(auth, id) };
   }
 }

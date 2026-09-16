@@ -1,0 +1,31 @@
+{
+  "name": "@gst/prisma-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared generated Prisma client for the transitional shared-database stage",
+  "type": "module",
+  "main": "./dist/generated/client.js",
+  "types": "./dist/generated/client.d.ts",
+  "exports": {
+    "./client": {
+      "types": "./dist/generated/client.d.ts",
+      "default": "./dist/generated/client.js"
+    },
+    "./enums": {
+      "types": "./dist/generated/enums.d.ts",
+      "default": "./dist/generated/enums.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "@prisma/client": "^7.10.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "@types/node": "^24.0.0"
+  }
+}

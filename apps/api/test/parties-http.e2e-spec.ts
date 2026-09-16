@@ -5,7 +5,12 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { DatabaseService } from '../src/database/database.service.js';
 import { TokenService } from '../src/auth/token.service.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { Prisma } from '@gst/prisma-client/client';
+import { PARTY_CLIENT } from '../src/party/application/party-client.port.js';
+import { CustomerApplicationService } from '../src/party/application/customer-application.service.js';
+import { SupplierApplicationService } from '../src/party/application/supplier-application.service.js';
+import { PrismaCustomerRepository } from '../src/party/infrastructure/prisma-customer.repository.js';
+import { PrismaSupplierRepository } from '../src/party/infrastructure/prisma-supplier.repository.js';
 
 describe.each(['customers', 'suppliers'] as const)(
   '%s HTTP (database doubles, real guards/services)',
@@ -117,9 +122,25 @@ describe.each(['customers', 'suppliers'] as const)(
       delegate.updateMany.mockResolvedValue({ count: 1 });
       delegate.count.mockResolvedValue(42);
       delegate.findMany.mockResolvedValue([]);
+      const customerApp = new CustomerApplicationService(new PrismaCustomerRepository(db as never));
+      const supplierApp = new SupplierApplicationService(new PrismaSupplierRepository(db as never));
+      const partyClient: any = {
+        createCustomer: (auth: any, dto: any) => customerApp.create(auth.user, dto),
+        listCustomers: (auth: any, query: any) => customerApp.list(auth.user, query),
+        getCustomer: (auth: any, partyId: any) => customerApp.detail(auth.user, partyId),
+        updateCustomer: (auth: any, partyId: any, dto: any) => customerApp.update(auth.user, partyId, dto),
+        deactivateCustomer: (auth: any, partyId: any) => customerApp.deactivate(auth.user, partyId),
+        createSupplier: (auth: any, dto: any) => supplierApp.create(auth.user, dto),
+        listSuppliers: (auth: any, query: any) => supplierApp.list(auth.user, query),
+        getSupplier: (auth: any, partyId: any) => supplierApp.detail(auth.user, partyId),
+        updateSupplier: (auth: any, partyId: any, dto: any) => supplierApp.update(auth.user, partyId, dto),
+        deactivateSupplier: (auth: any, partyId: any) => supplierApp.deactivate(auth.user, partyId),
+      };
       const module = await Test.createTestingModule({ imports: [AppModule] })
         .overrideProvider(DatabaseService)
         .useValue(db)
+        .overrideProvider(PARTY_CLIENT)
+        .useValue(partyClient)
         .compile();
       app = module.createNestApplication();
       app.useLogger(false);

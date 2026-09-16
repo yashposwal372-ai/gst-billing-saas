@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
-import { Prisma, type User } from '../generated/prisma/client.js';
+import { Prisma, type User } from '@gst/prisma-client/client';
 import { safeUserSelect } from '../users/user.select.js';
 import { PasswordService } from './password.service.js';
 import { TokenService, newToken, tokenHash, SESSION_MS } from './token.service.js';

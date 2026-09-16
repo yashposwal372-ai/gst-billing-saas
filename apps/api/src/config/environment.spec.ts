@@ -48,6 +48,8 @@ describe('environment validation', () => {
         REDIS_URL: 'rediss://cache:6379',
         JWT_SECRET: 'a'.repeat(48),
         JWT_REFRESH_SECRET: 'b'.repeat(48),
+        PARTY_SERVICE_BASE_URL: 'https://party.internal.example',
+        PARTY_SERVICE_HMAC_SECRET: 'c'.repeat(48),
       }).NODE_ENV,
     ).toBe('production');
   });

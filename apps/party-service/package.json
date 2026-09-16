@@ -1,0 +1,44 @@
+{
+  "name": "party-service",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build --workspace @gst/security-context \u0026\u0026 npm run build --workspace @gst/party-contracts \u0026\u0026 npm run build --workspace @gst/prisma-client \u0026\u0026 tsc -p tsconfig.build.json",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint --max-warnings 0",
+    "typecheck": "npm run build --workspace @gst/security-context \u0026\u0026 npm run build --workspace @gst/party-contracts \u0026\u0026 npm run build --workspace @gst/prisma-client \u0026\u0026 tsc --noEmit --incremental false",
+    "test": "npm run build --workspace @gst/security-context \u0026\u0026 npm run build --workspace @gst/party-contracts \u0026\u0026 npm run build --workspace @gst/prisma-client \u0026\u0026 vitest run",
+    "check": "node scripts/party-service-check.mjs"
+  },
+  "dependencies": {
+    "@gst/party-contracts": "*",
+    "@gst/security-context": "*",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/platform-express": "^12.0.1",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "pg": "^8.23.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "@gst/prisma-client": "*"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "typescript": "^6.0.2",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.1.2",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^7.0.0"
+  }
+}

@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
-import { BusinessType, GstMode } from '../../generated/prisma/enums.js';
+import { BusinessType, GstMode } from '@gst/prisma-client/enums';
 import { GSTIN_PATTERN, PAN_PATTERN } from '../../common/india-formats.js';
 
 const trim = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
