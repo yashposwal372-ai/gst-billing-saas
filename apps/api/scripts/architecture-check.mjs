@@ -10,6 +10,7 @@ const importPattern = /(?:import|export)\s+(?:type\s+)?(?:[^'";]+?\s+from\s+)?['
 
 const domainForbiddenPackages = [/^@nestjs\//, /^@prisma\//, /^ioredis$/, /^bullmq$/, /^kafkajs$/];
 const applicationForbiddenPackages = [/^@nestjs\/common$/];
+const securityForbiddenPackages = [/^@nestjs\//, /^@prisma\//, /^ioredis$/, /^bullmq$/, /^kafkajs$/];
 
 function normalized(path) {
   return path.split(sep).join('/');
@@ -20,7 +21,7 @@ async function walk(dir) {
   const files = [];
   for (const entry of entries) {
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(full));
+    if (entry.isDirectory()) { if (['node_modules', 'dist', '.turbo', 'coverage'].includes(entry.name)) continue; files.push(...await walk(full)); }
     else if (sourceExtensions.has(extname(entry.name)) && !entry.name.endsWith('.spec.ts')) files.push(full);
   }
   return files;
@@ -49,13 +50,17 @@ export function checkArchitectureImports(files) {
   for (const file of files) {
     const layer = layerOf(file.path);
     const contract = file.path.startsWith('packages/contracts/');
-    if (!layer && !contract) continue;
+    const securityContext = file.path.startsWith('packages/security-context/');
+    if (!layer && !contract && !securityContext && !file.path.startsWith('apps/api-gateway/')) continue;
     importPattern.lastIndex = 0;
     let match;
     while ((match = importPattern.exec(file.source)) !== null) {
       const importPath = match[1] ?? match[2];
       if (contract && (!importPath.startsWith('./') || /(?:domain|infrastructure|controller|service|generated|prisma)/i.test(importPath))) {
         violations.push(`${file.path}: contracts must contain local transport types only, not ${importPath}`);
+      }
+      if (securityContext && (securityForbiddenPackages.some((pattern) => pattern.test(importPath)) || /^apps\//.test(importPath) || /(?:domain|infrastructure|controller|service|generated|prisma|business)/i.test(importPath))) {
+        violations.push(`${file.path}: security-context must remain framework-neutral and not import ${importPath}`);
       }
       if (file.path.startsWith('apps/api-gateway/') && (/apps\/api\/src/.test(importPath) || /(?:^|\/)api\/src(?:\/|$)/.test(importPath))) {
         violations.push(`${file.path}: api-gateway must not import apps/api implementation source ${importPath}`);
@@ -82,6 +87,20 @@ export function checkArchitectureImports(files) {
   return violations;
 }
 
+async function addPackageFiles(files, packagePath, label, manifestCheck) {
+  const packageUrl = new URL(packagePath, repoRoot);
+  try {
+    const packageFsPath = packageUrl.pathname.replace(/^\/(.:\/)/, '$1');
+    for (const file of await walk(packageFsPath)) {
+      files.push({ path: `${label}/` + normalized(relative(packageFsPath, file)), source: await readFile(file, 'utf8') });
+    }
+    const manifest = JSON.parse(await readFile(new URL('package.json', packageUrl), 'utf8'));
+    manifestCheck(manifest);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
 export async function collectCheckedSourceFiles(rootUrl = sourceRoot) {
   const rootPath = rootUrl.pathname.replace(/^\/(.:\/)/, '$1');
   const files = [];
@@ -96,17 +115,12 @@ export async function collectCheckedSourceFiles(rootUrl = sourceRoot) {
       continue;
     }
   }
-  const contractsDir = new URL('packages/contracts/', repoRoot);
-  try {
-    const contractsPath = contractsDir.pathname.replace(/^\/(.:\/)/, '$1');
-    for (const file of await walk(contractsPath)) {
-      files.push({ path: 'packages/contracts/' + normalized(relative(contractsPath, file)), source: await readFile(file, 'utf8') });
-    }
-    const manifest = JSON.parse(await readFile(new URL('package.json', contractsDir), 'utf8'));
+  await addPackageFiles(files, 'packages/contracts/', 'packages/contracts', (manifest) => {
     if (Object.keys(manifest.dependencies ?? {}).length || Object.keys(manifest.peerDependencies ?? {}).length) throw new Error('contracts must have no runtime/framework dependencies');
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
+  });
+  await addPackageFiles(files, 'packages/security-context/', 'packages/security-context', (manifest) => {
+    if (Object.keys(manifest.dependencies ?? {}).length || Object.keys(manifest.peerDependencies ?? {}).length) throw new Error('security-context must have no runtime/framework dependencies');
+  });
   const gatewayDir = new URL('apps/api-gateway/', repoRoot);
   try {
     const gatewayPath = gatewayDir.pathname.replace(/^\/(.:\/)/, '$1');

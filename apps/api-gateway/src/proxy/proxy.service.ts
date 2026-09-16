@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import type { GatewayEnvironment } from '../config/gateway-environment.js';
+import { IdentityPropagationService } from '../security/identity-propagation.service.js';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
 export const CORRELATION_ID_HEADER = 'x-correlation-id';
@@ -44,7 +45,7 @@ export function shouldStripRequestHeader(name: string): boolean {
   );
 }
 
-export function buildForwardHeaders(source: IncomingHttpHeaders, requestId: string, correlationId: string, host?: string, remoteAddress?: string): IncomingHttpHeaders {
+export function buildForwardHeaders(source: IncomingHttpHeaders, requestId: string, correlationId: string, host?: string, remoteAddress?: string, trustedIdentityHeaders: IncomingHttpHeaders = {}): IncomingHttpHeaders {
   const headers: IncomingHttpHeaders = {};
   for (const [name, value] of Object.entries(source)) {
     if (shouldStripRequestHeader(name)) continue;
@@ -52,6 +53,9 @@ export function buildForwardHeaders(source: IncomingHttpHeaders, requestId: stri
   }
   headers[REQUEST_ID_HEADER] = requestId;
   headers[CORRELATION_ID_HEADER] = correlationId;
+  for (const [name, value] of Object.entries(trustedIdentityHeaders)) {
+    headers[name] = value;
+  }
   if (host) headers['x-forwarded-host'] = host;
   if (remoteAddress) headers['x-forwarded-for'] = remoteAddress;
   headers['x-forwarded-proto'] = 'http';
@@ -76,7 +80,7 @@ function sendGatewayError(res: Response, status: number, code: string, message: 
 
 @Injectable()
 export class ProxyService {
-  constructor(private readonly config: ConfigService<GatewayEnvironment, true>) {}
+  constructor(private readonly config: ConfigService<GatewayEnvironment, true>, private readonly identity: IdentityPropagationService) {}
 
   async forward(req: Request, res: Response): Promise<void> {
     const requestId = effectiveGatewayId(req.headers[REQUEST_ID_HEADER]);
@@ -90,7 +94,8 @@ export class ProxyService {
     const timeoutMs = this.config.get('PROXY_TIMEOUT_MS', { infer: true });
     const upstreamUrl = new URL(req.originalUrl, upstreamBase);
     const transport = upstreamUrl.protocol === 'https:' ? httpsRequest : httpRequest;
-    const headers = buildForwardHeaders(req.headers, requestId, correlationId, req.headers.host, req.socket.remoteAddress);
+    const identity = await this.identity.buildTrustedHeaders({ headers: req.headers as Record<string, unknown>, requestId, correlationId });
+    const headers = buildForwardHeaders(req.headers, requestId, correlationId, req.headers.host, req.socket.remoteAddress, identity.headers);
 
     await new Promise<void>((resolve) => {
       let settled = false;

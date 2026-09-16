@@ -92,6 +92,13 @@ npm run gateway:build
 ```
 
 A05 does not create physical business services, Kafka, outbox/inbox, Prisma schema changes or migrations. A06 will design identity and security propagation.
+## A06 identity and security propagation (2026-09-16)
+
+The gateway now performs stateless verification of the current access JWT only to create a short-lived trusted internal identity context for future downstream services. Current access tokens are `jose` JWTs signed with HS256, issuer `gst-billing-api`, audience `gst-billing-web`, subject `sub` as the user ID, and `sid` as the session ID. The current symmetric `JWT_SECRET` must be shared with the gateway for verification during this migration stage; the gateway does not mint, refresh, revoke or log access tokens. Future asymmetric verification is preferable before wider service extraction.
+
+When a valid access cookie is present, the gateway signs a compact context using HMAC-SHA-256 and forwards it in `X-GST-Internal-Context` and `X-GST-Internal-Signature`. The context is base64url encoded, versioned, has source `api-gateway`, audience `gst-internal-services`, includes request/correlation IDs, user ID and session ID, and expires after at most 60 seconds. It never contains raw JWTs, refresh tokens, cookies, email, phone, GSTIN, PAN, bank data or business/customer data. Public `x-gst-internal-*` and `x-internal-*` headers remain stripped before new trusted headers are generated.
+
+Compatibility is unchanged for public `/api/v1` traffic. Missing, expired, malformed or wrongly signed access cookies do not produce internal identity headers, but the request still proxies normally so the monolith remains the current authentication, CSRF, session validity, business membership, tenant authorization and resource authorization authority. Refresh cookies alone never establish gateway identity. No database or Redis lookup is performed by the gateway, and no frontend cutover, physical service extraction, Kafka, outbox/inbox, Prisma schema change or migration is introduced.
 ## Requirements and installation
 
 Node >=24 (verified 24.19.0), npm 11.17.0, and Docker with Compose for local PostgreSQL/Redis. Run from the repository root:

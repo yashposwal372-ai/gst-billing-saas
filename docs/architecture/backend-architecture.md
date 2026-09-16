@@ -363,3 +363,17 @@ A06 ï¿½ Identity + Security Propagation is next. It requires explicit authorizat
 ## A06 next
 
 A06 ï¿½ Identity + Security Propagation requires explicit authorization. It has not started.
+
+## A06 Identity and security propagation
+
+A06 adds a compatibility-preserving identity propagation foundation between public clients, `apps/api-gateway`, the current monolith and future internal services. The public trust boundary remains at the gateway, but the current `apps/api` monolith remains authoritative for authentication responses, refresh/session validity, CSRF, tenant authorization, business membership and resource authorization.
+
+The gateway verifies the existing access credential statelessly when possible. The current token format is a `jose` JWT signed with HS256 using `JWT_SECRET`, issuer `gst-billing-api`, audience `gst-billing-web`, `sub` for user ID and `sid` for session ID. Because the current token is symmetric, sharing the verification secret with the gateway is a migration constraint. The gateway never mints access tokens, refreshes tokens, revokes sessions or uses refresh tokens for identity propagation.
+
+A valid access cookie lets the gateway create a signed internal context. Missing, expired, malformed, wrong-key or unsupported access tokens do not create trusted context and do not produce gateway 401/403 responses; the original request still proxies to the monolith unchanged so existing public behavior is preserved. Refresh-only requests similarly proxy without trusted context.
+
+The internal context is produced by the framework-neutral `packages/security-context` package. It is version `1`, source `api-gateway`, audience `gst-internal-services`, base64url encoded, HMAC-SHA-256 signed with `INTERNAL_IDENTITY_HMAC_SECRET`, and bounded to a maximum lifetime of 60 seconds. It includes request ID and correlation ID so downstream verification can reject accidental context swapping. The claim allowlist is user ID and session ID only; business ID and roles are omitted because the current access token does not carry authoritative business or role claims. No raw JWT, refresh token, cookie value, email, phone, GSTIN, PAN, bank data or customer data is included.
+
+Trusted transport uses exactly `X-GST-Internal-Context` and `X-GST-Internal-Signature`. A05's reserved header stripping remains in force for public client input: `x-gst-internal-*` and `x-internal-*` are removed before any new trusted gateway-generated headers are attached. Future extracted services can use `packages/security-context` to verify signature, version, source, audience, expiry, future skew, payload size and request/correlation binding without importing NestJS, Prisma, Redis or business modules.
+
+A06 does not cut the frontend over to the gateway, does not make the gateway an authorization authority, does not query PostgreSQL or Redis, does not add Kafka/outbox/inbox and does not extract a physical business service. A07 — Internal Party Clean Architecture Boundary is next and requires explicit authorization.

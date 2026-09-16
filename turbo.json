@@ -45,7 +45,9 @@
         "NEXT_PUBLIC_API_URL",
         "GATEWAY_PORT",
         "MONOLITH_BASE_URL",
-        "PROXY_TIMEOUT_MS"
+        "PROXY_TIMEOUT_MS",
+        "INTERNAL_IDENTITY_HMAC_SECRET",
+        "INTERNAL_IDENTITY_MAX_AGE_MS"
       ]
     },
     "typecheck": {

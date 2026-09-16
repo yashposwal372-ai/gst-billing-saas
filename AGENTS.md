@@ -39,7 +39,19 @@ Build a production-oriented SaaS for Indian businesses, phase by phase. Authenti
 - The gateway preserves method, path, query, raw body bytes, cookies, `Set-Cookie`, Origin and `X-CSRF-Protection`. It does not decode JWTs, authenticate users, select tenants, authorize resources, validate business DTOs, calculate GST, mutate stock, post payments, retry requests, cache responses or add Redis rate limiting.
 - Public client spoofing of future internal identity is blocked by stripping `x-gst-internal-*` and `x-internal-*`. Hop-by-hop headers are stripped; client forwarded headers are reconstructed at the trusted edge. `X-Request-ID` and `X-Correlation-ID` are bounded and preserved only when safe, otherwise generated, then propagated upstream and returned on gateway responses/errors.
 - Gateway health routes are `GET /health/live` and `GET /health/ready`; existing `/api/v1/health` still proxies to the monolith. `npm run gateway:check`, `npm run gateway:test`, `npm run gateway:build`, root lint/typecheck/build, OpenAPI checks and Prisma checks validate A05 without PostgreSQL or Redis.
-- No physical business service, Kafka, outbox/inbox, frontend cutover, Prisma schema change or migration was introduced. A06 � Identity + Security Propagation is next and requires explicit authorization. Do not begin A06 or Phase 11 as part of A05.## Verified Phase 8 implementation: 2026-09-09
+- No physical business service, Kafka, outbox/inbox, frontend cutover, Prisma schema change or migration was introduced. A06 � Identity + Security Propagation is next and requires explicit authorization. Do not begin A06 or Phase 11 as part of A05.
+
+## Architecture track A06 identity and security propagation: 2026-09-16
+
+- A06 continues from published A05 checkpoint 6f3919184332caad3fccb47db3663d9b6cc8e729. The gateway now verifies the current HS256 jose access JWT statelessly when JWT_SECRET is configured, using issuer gst-billing-api, audience gst-billing-web, sub as user ID and sid as session ID.
+- packages/security-context provides framework-neutral HMAC-SHA-256 signing and verification for short-lived internal identity context. It has no NestJS, Prisma, Redis, database, app, business-module or HTTP-framework dependency.
+- Trusted internal headers are X-GST-Internal-Context and X-GST-Internal-Signature. The context is base64url encoded, versioned, source api-gateway, audience gst-internal-services, bound to X-Request-ID and X-Correlation-ID, and expires within 60 seconds.
+- The claim allowlist is user ID and session ID only. Business ID, roles and permissions are omitted because the current access JWT does not carry authoritative values for them. Raw JWTs, refresh tokens, cookies and PII are never propagated inside the internal context.
+- Missing, malformed, expired or wrongly signed access cookies do not create trusted internal headers and do not cause new gateway 401/403 behavior. Requests continue proxying to the monolith, which remains the current authentication, CSRF, session validity, tenant authorization, business membership and resource authorization authority.
+- Refresh cookies never establish gateway identity. The gateway performs no DB/Redis lookup, Prisma access, role decision, business membership lookup, frontend cutover, physical service extraction, Kafka or outbox/inbox work.
+- A07 - Internal Party Clean Architecture Boundary is next and requires explicit authorization. Do not begin A07 or Phase 11 as part of A06.
+
+## Verified Phase 8 implementation: 2026-09-09
 
 - Started from approved clean Phase 7 checkpoint 53527f95d1a5cf9b8da35b98b649da1ae488791a. No Phase 9 work, push, reset, destructive Prisma operation, Docker installation or forced audit fix was performed.
 - Added Phase 8 finance persistence: MoneyAccount, MoneyAccountEntry, FinanceSequence, Payment, PaymentAllocation, ExpenseCategory, Expense and AccountTransfer plus finance enums and Business.nextAccountNumber. Account codes use the existing atomic business-counter pattern. Payment/expense/transfer numbers are assigned on posting/creation using per-business, per-financial-year finance sequences.

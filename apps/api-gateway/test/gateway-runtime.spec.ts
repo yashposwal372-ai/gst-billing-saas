@@ -2,7 +2,23 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { once } from 'node:events';
 import { AddressInfo } from 'node:net';
 import { Test } from '@nestjs/testing';
+import { SignJWT } from 'jose';
+import { INTERNAL_CONTEXT_HEADER, INTERNAL_SIGNATURE_HEADER, verifySecurityContext } from '@gst/security-context';
 import { describe, expect, it, vi } from 'vitest';
+
+const jwtSecret = 'jwt-secret-for-a06-runtime-tests-at-least-32-bytes';
+const internalSecret = 'internal-secret-for-a06-runtime-tests-at-least-32-bytes';
+
+async function accessToken(overrides: { secret?: string; expiresIn?: string } = {}) {
+  return new SignJWT({ sid: 'session-1' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject('user-1')
+    .setIssuer('gst-billing-api')
+    .setAudience('gst-billing-web')
+    .setIssuedAt()
+    .setExpirationTime(overrides.expiresIn ?? '15m')
+    .sign(new TextEncoder().encode(overrides.secret ?? jwtSecret));
+}
 
 async function startFixture(handler: (req: IncomingMessage, res: ServerResponse) => void) {
   const server = createServer(handler);
@@ -12,11 +28,14 @@ async function startFixture(handler: (req: IncomingMessage, res: ServerResponse)
   return { server, baseUrl: `http://127.0.0.1:${port}` };
 }
 
-async function startGateway(upstream: string, timeout = '500') {
-  const old = { NODE_ENV: process.env.NODE_ENV, MONOLITH_BASE_URL: process.env.MONOLITH_BASE_URL, PROXY_TIMEOUT_MS: process.env.PROXY_TIMEOUT_MS, GATEWAY_PORT: process.env.GATEWAY_PORT };
-  process.env.NODE_ENV = 'test';
+async function startGateway(upstream: string, timeout = '500', env: Record<string, string> = {}) {
+  const old = { NODE_ENV: process.env.NODE_ENV, MONOLITH_BASE_URL: process.env.MONOLITH_BASE_URL, PROXY_TIMEOUT_MS: process.env.PROXY_TIMEOUT_MS, GATEWAY_PORT: process.env.GATEWAY_PORT, JWT_SECRET: process.env.JWT_SECRET, INTERNAL_IDENTITY_HMAC_SECRET: process.env.INTERNAL_IDENTITY_HMAC_SECRET, INTERNAL_IDENTITY_MAX_AGE_MS: process.env.INTERNAL_IDENTITY_MAX_AGE_MS };
+  process.env.NODE_ENV = env.NODE_ENV ?? 'test';
   process.env.MONOLITH_BASE_URL = upstream;
   process.env.PROXY_TIMEOUT_MS = timeout;
+  process.env.JWT_SECRET = env.JWT_SECRET ?? jwtSecret;
+  process.env.INTERNAL_IDENTITY_HMAC_SECRET = env.INTERNAL_IDENTITY_HMAC_SECRET ?? internalSecret;
+  process.env.INTERNAL_IDENTITY_MAX_AGE_MS = env.INTERNAL_IDENTITY_MAX_AGE_MS ?? '60000';
   vi.resetModules();
   const [{ AppModule }, { configureGateway }] = await Promise.all([import('../src/app.module.js'), import('../src/common/configure-gateway.js')]);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -64,8 +83,65 @@ describe('api gateway fixture runtime', () => {
       expect(headers.origin).toBe('http://localhost:3000');
       expect(headers['x-csrf-protection']).toBe('1');
       expect(headers['x-gst-internal-user-id']).toBeUndefined();
+      expect(headers['x-gst-internal-context']).toBeUndefined();
       expect(headers['x-request-id']).toBe('client-req-1');
       expect(headers['x-correlation-id']).toBe('client-corr-1');
+    } finally {
+      await gateway.app.close();
+      gateway.restore();
+      fixture.server.close();
+    }
+  });
+
+  it('generates signed internal identity context for valid access cookies and strips public spoofing', async () => {
+    const seen: IncomingMessage['headers'][] = [];
+    const fixture = await startFixture((req, res) => { seen.push(req.headers); res.end('ok'); });
+    const gateway = await startGateway(fixture.baseUrl);
+    try {
+      const response = await fetch(`${gateway.baseUrl}/api/v1/customers`, {
+        headers: { Cookie: `gst_access=${await accessToken()}`, 'X-Request-ID': 'req-verified', 'X-Correlation-ID': 'corr-verified', 'X-GST-Internal-Context': 'spoof', 'X-GST-Internal-Signature': 'spoof', 'X-Internal-User-ID': 'spoof' },
+      });
+      expect(response.status).toBe(200);
+      const headers = seen[0]!;
+      expect(headers['x-internal-user-id']).toBeUndefined();
+      expect(headers['x-gst-internal-context']).not.toBe('spoof');
+      const payload = verifySecurityContext({ secret: internalSecret, encodedContext: String(headers['x-gst-internal-context']), signature: String(headers['x-gst-internal-signature']), expectedRequestId: 'req-verified', expectedCorrelationId: 'corr-verified' });
+      expect(payload).toMatchObject({ userId: 'user-1', sessionId: 'session-1' });
+    } finally {
+      await gateway.app.close();
+      gateway.restore();
+      fixture.server.close();
+    }
+  });
+
+  it('does not create trusted identity context for no access, refresh-only or invalid access cookies', async () => {
+    const seen: IncomingMessage['headers'][] = [];
+    const fixture = await startFixture((req, res) => { seen.push(req.headers); res.end('ok'); });
+    const gateway = await startGateway(fixture.baseUrl);
+    try {
+      await fetch(`${gateway.baseUrl}/api/v1/customers`);
+      await fetch(`${gateway.baseUrl}/api/v1/customers`, { headers: { Cookie: 'gst_refresh=opaque' } });
+      await fetch(`${gateway.baseUrl}/api/v1/customers`, { headers: { Cookie: `gst_access=${await accessToken({ expiresIn: '-1s' })}` } });
+      await fetch(`${gateway.baseUrl}/api/v1/customers`, { headers: { Cookie: 'gst_access=malformed' } });
+      await fetch(`${gateway.baseUrl}/api/v1/customers`, { headers: { Cookie: `gst_access=${await accessToken({ secret: 'wrong-secret-for-a06-runtime-tests-at-least-32-bytes' })}` } });
+      for (const headers of seen) {
+        expect(headers['x-gst-internal-context']).toBeUndefined();
+        expect(headers['x-gst-internal-signature']).toBeUndefined();
+      }
+    } finally {
+      await gateway.app.close();
+      gateway.restore();
+      fixture.server.close();
+    }
+  });
+
+  it('supports production access cookie name for identity propagation', async () => {
+    const seen: IncomingMessage['headers'][] = [];
+    const fixture = await startFixture((req, res) => { seen.push(req.headers); res.end('ok'); });
+    const gateway = await startGateway(fixture.baseUrl, '500', { NODE_ENV: 'production' });
+    try {
+      await fetch(`${gateway.baseUrl}/api/v1/customers`, { headers: { Cookie: `__Host-gst_access=${await accessToken()}` } });
+      expect(seen[0]!['x-gst-internal-context']).toBeDefined();
     } finally {
       await gateway.app.close();
       gateway.restore();

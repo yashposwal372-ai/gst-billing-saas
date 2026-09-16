@@ -5,13 +5,13 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run build --workspace @gst/security-context && tsc -p tsconfig.build.json",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "lint": "eslint --max-warnings 0",
-    "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run",
+    "typecheck": "npm run build --workspace @gst/security-context && tsc --noEmit --incremental false",
+    "test": "npm run build --workspace @gst/security-context && vitest run",
     "check": "node scripts/gateway-check.mjs"
   },
   "dependencies": {
@@ -21,7 +21,9 @@
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@gst/security-context": "*",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",
