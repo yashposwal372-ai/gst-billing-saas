@@ -63,6 +63,35 @@ Generated Next.js/React Native clients and Gateway ownership remain future work.
 
 Implementation follows the [Nest Swagger document API](https://docs.nestjs.com/openapi/introduction).
 
+
+## A05 API Gateway foundation (2026-09-14)
+
+`apps/api-gateway` is a parallel NestJS TypeScript public-edge foundation for the future Strangler migration. It does not replace the current backend yet, and the frontend has not been cut over. The current business API remains `apps/api` on `http://localhost:4000/api/v1`; the gateway defaults to `http://localhost:4100` and generically proxies only `/api/v1` and `/api/v1/*` to the trusted `MONOLITH_BASE_URL`.
+
+Gateway defaults are safe local development values:
+
+- `GATEWAY_PORT=4100`
+- `MONOLITH_BASE_URL=http://127.0.0.1:4000`
+- `PROXY_TIMEOUT_MS=30000`
+
+The gateway preserves methods, paths, query strings, raw bodies, cookies, `Set-Cookie`, `Origin` and `X-CSRF-Protection`. It does not decode auth cookies, perform tenant authorization, retry side-effecting requests, cache responses, or duplicate business logic. It strips hop-by-hop headers, reconstructs forwarded headers at the trusted edge, strips reserved `x-gst-internal-*` and `x-internal-*` headers, and propagates bounded `X-Request-ID` and `X-Correlation-ID` values. Gateway-owned health endpoints are `GET /health/live` and `GET /health/ready`; the existing `/api/v1/health` continues to proxy to the monolith.
+
+Run the gateway in parallel:
+
+```sh
+npm run start:dev --workspace api
+npm run gateway:dev
+```
+
+Useful checks:
+
+```sh
+npm run gateway:check
+npm run gateway:test
+npm run gateway:build
+```
+
+A05 does not create physical business services, Kafka, outbox/inbox, Prisma schema changes or migrations. A06 will design identity and security propagation.
 ## Requirements and installation
 
 Node >=24 (verified 24.19.0), npm 11.17.0, and Docker with Compose for local PostgreSQL/Redis. Run from the repository root:

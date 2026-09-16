@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join, relative, sep } from 'node:path';
 
 const sourceRoot = new URL('../src/', import.meta.url);
+const repoRoot = new URL('../../../', import.meta.url);
 const checkedRoots = ['platform'];
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.mjs']);
 
@@ -56,6 +57,9 @@ export function checkArchitectureImports(files) {
       if (contract && (!importPath.startsWith('./') || /(?:domain|infrastructure|controller|service|generated|prisma)/i.test(importPath))) {
         violations.push(`${file.path}: contracts must contain local transport types only, not ${importPath}`);
       }
+      if (file.path.startsWith('apps/api-gateway/') && (/apps\/api\/src/.test(importPath) || /(?:^|\/)api\/src(?:\/|$)/.test(importPath))) {
+        violations.push(`${file.path}: api-gateway must not import apps/api implementation source ${importPath}`);
+      }
       const targetLayer = importedLayer(importPath, file.path);
       if (layer === 'domain') {
         if (domainForbiddenPackages.some((pattern) => pattern.test(importPath))) {
@@ -92,7 +96,7 @@ export async function collectCheckedSourceFiles(rootUrl = sourceRoot) {
       continue;
     }
   }
-  const contractsDir = new URL('../../../packages/contracts/', rootUrl);
+  const contractsDir = new URL('packages/contracts/', repoRoot);
   try {
     const contractsPath = contractsDir.pathname.replace(/^\/(.:\/)/, '$1');
     for (const file of await walk(contractsPath)) {
@@ -100,6 +104,15 @@ export async function collectCheckedSourceFiles(rootUrl = sourceRoot) {
     }
     const manifest = JSON.parse(await readFile(new URL('package.json', contractsDir), 'utf8'));
     if (Object.keys(manifest.dependencies ?? {}).length || Object.keys(manifest.peerDependencies ?? {}).length) throw new Error('contracts must have no runtime/framework dependencies');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const gatewayDir = new URL('apps/api-gateway/', repoRoot);
+  try {
+    const gatewayPath = gatewayDir.pathname.replace(/^\/(.:\/)/, '$1');
+    for (const file of await walk(gatewayPath)) {
+      files.push({ path: 'apps/api-gateway/' + normalized(relative(gatewayPath, file)), source: await readFile(file, 'utf8') });
+    }
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }

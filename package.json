@@ -10,7 +10,11 @@
     "typecheck": "turbo run typecheck",
     "architecture:check": "npm run architecture:check --workspace api",
     "openapi:generate": "npm run openapi:generate --workspace api",
-    "openapi:check": "npm run openapi:check --workspace api"
+    "openapi:check": "npm run openapi:check --workspace api",
+    "gateway:dev": "npm run start:dev --workspace api-gateway",
+    "gateway:build": "npm run build --workspace api-gateway",
+    "gateway:test": "npm run test --workspace api-gateway",
+    "gateway:check": "npm run check --workspace api-gateway"
   },
   "devDependencies": {
     "prettier": "3.9.6",

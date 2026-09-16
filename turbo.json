@@ -42,7 +42,10 @@
         "REDIS_URL",
         "JWT_SECRET",
         "JWT_REFRESH_SECRET",
-        "NEXT_PUBLIC_API_URL"
+        "NEXT_PUBLIC_API_URL",
+        "GATEWAY_PORT",
+        "MONOLITH_BASE_URL",
+        "PROXY_TIMEOUT_MS"
       ]
     },
     "typecheck": {

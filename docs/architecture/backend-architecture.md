@@ -334,6 +334,32 @@ in A04. Internal `/internal/v1/*` contracts will be separate and are not publish
 in this public snapshot. Party remains the first later physical extraction after
 A04–A07 prerequisites.
 
-## A05 next
 
-A05 — API Gateway Foundation requires explicit authorization. It has not started.
+## A05 API Gateway foundation
+
+A05 introduces `apps/api-gateway` as a parallel public-edge NestJS TypeScript application. The current runtime topology is:
+
+```text
+apps/web -> apps/api-gateway :4100 -> apps/api :4000/api/v1 -> Prisma/PostgreSQL
+```
+
+The frontend is not cut over in A05; it still uses the configured API base URL. The gateway defaults to port `4100` and forwards only `/api/v1` and `/api/v1/*` to the trusted `MONOLITH_BASE_URL`. Gateway native operational endpoints are `GET /health/live` and `GET /health/ready`. Unknown routes outside those namespaces return 404 and are not proxied, so the gateway is not an open proxy.
+
+A05 gateway responsibilities are transport-only: receive HTTP, forward the public v1 API namespace, preserve request and response semantics, provide bounded upstream timeout handling, return safe gateway-originated transport errors, add transport request/correlation IDs, strip untrusted internal identity headers, and expose operational health. The monolith remains authoritative for authentication, CSRF enforcement, validation, tenant authorization, GST calculation, stock, billing, finance, reports, POS and persistence.
+
+The gateway must not retry proxied requests. This protects side-effecting operations such as invoice finalization, payment posting, POS checkout, stock adjustments, expenses and transfers. Domain endpoints keep their own idempotency where already implemented. A05 also adds no response cache, Redis rate limiter, WebSocket proxy, API Gateway OpenAPI ownership, physical business service, Kafka, outbox/inbox, service-owned database schema, Prisma model change or migration.
+
+Header policy at the public edge:
+
+- `X-Request-ID` and `X-Correlation-ID` are preserved only when bounded to safe printable characters; invalid or oversized values are replaced with generated UUIDs.
+- Effective IDs are sent upstream and returned on gateway responses and gateway-originated errors.
+- Client-supplied `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` are not trusted; the gateway reconstructs forwarded headers.
+- Hop-by-hop headers are stripped.
+- Reserved future internal identity namespaces `x-gst-internal-*` and `x-internal-*` are stripped before upstream forwarding. A05 does not create or trust internal identity.
+
+`npm run gateway:check` validates that the 185-operation A04 OpenAPI contract is covered by the `/api/v1` proxy rule, checks config and header policies, and rejects gateway imports from `apps/api` implementation source. Gateway fixture tests cover GET/POST, raw bodies, encoded paths, repeated query keys, cookies, multiple `Set-Cookie`, CSRF/Origin forwarding, ID handling, internal header stripping, upstream 5xx pass-through, unavailable/timeout errors, no retries and health.
+
+A06 � Identity + Security Propagation is next. It requires explicit authorization and has not started.
+## A06 next
+
+A06 � Identity + Security Propagation requires explicit authorization. It has not started.
