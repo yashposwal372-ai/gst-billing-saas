@@ -5,14 +5,15 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "npm run build --workspace @gst/security-context \u0026\u0026 npm run build --workspace @gst/party-contracts \u0026\u0026 npm run build --workspace @gst/prisma-client \u0026\u0026 tsc -p tsconfig.build.json",
+    "build": "npm run build --workspace @gst/security-context && npm run build --workspace @gst/party-contracts && npm run build --workspace @gst/prisma-client && tsc -p tsconfig.build.json",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "lint": "eslint --max-warnings 0",
-    "typecheck": "npm run build --workspace @gst/security-context \u0026\u0026 npm run build --workspace @gst/party-contracts \u0026\u0026 npm run build --workspace @gst/prisma-client \u0026\u0026 tsc --noEmit --incremental false",
-    "test": "npm run build --workspace @gst/security-context \u0026\u0026 npm run build --workspace @gst/party-contracts \u0026\u0026 npm run build --workspace @gst/prisma-client \u0026\u0026 vitest run",
-    "check": "node scripts/party-service-check.mjs"
+    "typecheck": "npm run build --workspace @gst/security-context && npm run build --workspace @gst/party-contracts && npm run build --workspace @gst/prisma-client && tsc --noEmit --incremental false",
+    "test": "npm run build --workspace @gst/security-context && npm run build --workspace @gst/party-contracts && npm run build --workspace @gst/prisma-client && vitest run",
+    "check": "node scripts/party-service-check.mjs",
+    "test:postgres": "vitest run --config ./vitest.config.ts test/party-postgres.integration.spec.ts"
   },
   "dependencies": {
     "@gst/party-contracts": "*",

@@ -341,3 +341,19 @@ Local ports are now: web `3000`, API monolith `4000`, API gateway `4100`, and pa
 The monolith remains responsible for public authentication, browser CSRF behavior and tenant/business resolution. It signs a short-lived service context with `PARTY_SERVICE_HMAC_SECRET` using source `api-monolith` and audience `party-service`. Party-service trusts only `X-GST-Internal-Context` plus `X-GST-Internal-Signature`; it does not read public JWT cookies and does not accept a body/query `businessId` as tenant authority.
 
 Party-service uses the same PostgreSQL database and canonical Prisma schema as a transitional shared-database stage. The generated Prisma client is shared through `@gst/prisma-client`; no migration, DB-per-service split, Kafka, outbox, Redis cache or frontend cutover is part of A08.
+
+## A09 first microservice stabilization (2026-09-17)
+
+A09 adds a permanent GitHub Actions CI foundation for the published A08 party-service extraction. The workflow uses Ubuntu, Node 24 and `npm ci`, runs deterministic repository checks, and has a separate PostgreSQL 17 service-container job that deploys the committed Prisma migration history from an empty database before running opt-in party-service integration tests. The workflow uses synthetic CI-only credentials and has `contents: read` permissions only.
+
+Party-service real-database coverage is opt-in locally through:
+
+```sh
+$env:RUN_PARTY_POSTGRES_TESTS='1'
+$env:TEST_DATABASE_URL='postgresql://user:password@localhost:5432/test_db'
+npm run test:postgres --workspace party-service
+```
+
+Those tests exercise the actual party-service HTTP stack, signed `api-monolith -> party-service` context verification, the real Prisma adapter, Customer/Supplier create/list/search/detail/update/deactivate/reactivate paths, tenant isolation, tenant-scoped GSTIN uniqueness, exact Decimal opening-balance serialization, health/readiness behavior, unavailable/timeout behavior and Prisma shutdown ownership. They do not change the public `/api/v1/customers` or `/api/v1/suppliers` contracts, do not route the Gateway directly to party-service, and do not add a second service, Kafka, outbox/inbox or a separate Party database.
+
+The monolith still owns public authentication and tenant resolution. Party-service owns production Customer/Supplier writes through signed internal context. Existing monolith direct Party reads in invoices, sales/purchases, finance, documents, POS, dashboard and GST reports remain transitional shared-database read coupling until a later migration step.

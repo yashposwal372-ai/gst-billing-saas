@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { INTERNAL_CONTEXT_HEADER, INTERNAL_SIGNATURE_HEADER, PARTY_SERVICE_CONTEXT_AUDIENCE, PARTY_SERVICE_CONTEXT_SOURCE, signSecurityContext } from '@gst/security-context';
 import type { CustomerCommand, CustomerCreateResponse, CustomerDetail, CustomerListItem, CustomerProfile, CustomerUpdateResponse, PartyErrorResponse, PartyListQuery, PartyListResult, SupplierCommand, SupplierCreateResponse, SupplierDetail, SupplierListItem, SupplierProfile, SupplierUpdateResponse } from '@gst/party-contracts';
@@ -12,9 +12,11 @@ function queryString(query: PartyListQuery): string { return new URLSearchParams
 
 @Injectable()
 export class HttpPartyServiceClient implements PartyClientPort {
+  private readonly logger = new Logger(HttpPartyServiceClient.name);
+
   constructor(private readonly config: ConfigService<Environment, true>) {}
 
-  private headers(auth: AuthContext) {
+  private signedHeaders(auth: AuthContext) {
     if (!auth.user.currentBusinessId) throw new BadRequestException('Business owner access required');
     const requestId = safeId('api');
     const correlationId = requestId;
@@ -28,20 +30,28 @@ export class HttpPartyServiceClient implements PartyClientPort {
       sessionId: auth.sessionId,
       businessId: auth.user.currentBusinessId,
     });
-    return { 'content-type': 'application/json', 'x-request-id': requestId, 'x-correlation-id': correlationId, [INTERNAL_CONTEXT_HEADER]: signed.encodedContext, [INTERNAL_SIGNATURE_HEADER]: signed.signature };
+    return { requestId, correlationId, headers: { 'content-type': 'application/json', 'x-request-id': requestId, 'x-correlation-id': correlationId, [INTERNAL_CONTEXT_HEADER]: signed.encodedContext, [INTERNAL_SIGNATURE_HEADER]: signed.signature } };
   }
 
   private async request<T>(auth: AuthContext, method: string, path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.get('PARTY_SERVICE_TIMEOUT_MS', { infer: true }));
+    const signed = this.signedHeaders(auth);
+    const operation = `${method} ${path.split('?')[0]}`;
     try {
-      const response = await fetch(`${cleanBase(this.config.get('PARTY_SERVICE_BASE_URL', { infer: true }))}${path}`, { method, headers: this.headers(auth), body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
+      this.logger.log({ event: 'party.request', service: 'party-service', operation, requestId: signed.requestId, correlationId: signed.correlationId });
+      const response = await fetch(`${cleanBase(this.config.get('PARTY_SERVICE_BASE_URL', { infer: true }))}${path}`, { method, headers: signed.headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
       const text = await response.text();
       const payload = text ? JSON.parse(text) as unknown : undefined;
-      if (response.ok) return payload as T;
+      if (response.ok) {
+        this.logger.log({ event: 'party.response', service: 'party-service', operation, outcome: 'success', status: response.status, requestId: signed.requestId, correlationId: signed.correlationId });
+        return payload as T;
+      }
+      this.logger.warn({ event: 'party.response', service: 'party-service', operation, outcome: 'error', status: response.status, requestId: signed.requestId, correlationId: signed.correlationId });
       this.mapError(response.status, payload);
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ConflictException) throw error;
+      this.logger.warn({ event: 'party.transport_error', service: 'party-service', operation, outcome: 'unavailable', requestId: signed.requestId, correlationId: signed.correlationId });
       throw new ServiceUnavailableException('Party service is unavailable');
     } finally {
       clearTimeout(timeout);

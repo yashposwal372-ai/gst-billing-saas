@@ -4,13 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const serviceRoot = join(repoRoot, 'apps/party-service');
+const apiRoot = join(repoRoot, 'apps/api/src');
 const errors = [];
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) { if (!['node_modules', 'dist', '.turbo', 'coverage'].includes(entry.name)) files.push(...await walk(full)); }
+    if (entry.isDirectory()) { if (!['node_modules', 'dist', '.turbo', 'coverage', 'generated'].includes(entry.name)) files.push(...await walk(full)); }
     else if (/\.(ts|js|mjs)$/.test(entry.name)) files.push(full);
   }
   return files;
@@ -29,5 +30,22 @@ for (const [file, source] of sources) {
 }
 const monolithParty = await readFile(join(repoRoot, 'apps/api/src/party/party.module.ts'), 'utf8');
 if (!monolithParty.includes('HttpPartyServiceClient') || /PrismaCustomerRepository|PrismaSupplierRepository/.test(monolithParty)) errors.push('Monolith PartyModule must wire only the remote HTTP client');
+
+const apiFiles = await walk(apiRoot);
+const apiSource = new Map();
+for (const file of apiFiles) apiSource.set(relative(apiRoot, file).split(sep).join('/'), await readFile(file, 'utf8'));
+const allowedLegacyPartyWriters = new Set([
+  'party/infrastructure/prisma-customer.repository.ts',
+  'party/infrastructure/prisma-supplier.repository.ts',
+]);
+for (const [file, source] of apiSource) {
+  if (file.endsWith('.spec.ts') || file.startsWith('test/')) continue;
+  const writesCustomer = /\b(?:tx\.)?customer\.(?:create|update|updateMany|upsert|delete|deleteMany)\s*\(/.test(source);
+  const writesSupplier = /\b(?:tx\.)?supplier\.(?:create|update|updateMany|upsert|delete|deleteMany)\s*\(/.test(source);
+  if ((writesCustomer || writesSupplier) && !allowedLegacyPartyWriters.has(file)) errors.push(`Unexpected production Party writer in apps/api/src/${file}`);
+}
+for (const [file, source] of apiSource) {
+  if (allowedLegacyPartyWriters.has(file) && /providers:\s*\[[\s\S]*Prisma(?:Customer|Supplier)Repository/.test(source)) errors.push(`Legacy Party writer must not be production-wired in ${file}`);
+}
 if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
-console.log('Party service check passed: internal routes, service context, no public JWT/cookie auth, no retry policy, and monolith remote-client wiring verified.');
+console.log('Party service check passed: internal routes, service context, no public JWT/cookie auth, no retry policy, monolith remote-client wiring, and Party single-writer ownership verified.');

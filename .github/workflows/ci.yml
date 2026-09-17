@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    name: Deterministic validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Use repository npm
+        run: npm install -g npm@11.17.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Architecture check
+        run: npm run architecture:check
+      - name: Gateway check
+        run: npm run gateway:check
+      - name: Party service check
+        run: npm run party-service:check
+      - name: OpenAPI check
+        run: npm run openapi:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Security context tests
+        run: npm run test --workspace @gst/security-context
+      - name: Gateway tests
+        run: npm run test --workspace api-gateway
+      - name: Party service unit and contract tests
+        run: npm run test --workspace party-service
+      - name: API unit tests
+        run: npm run test --workspace api
+      - name: API HTTP and e2e tests
+        run: npm run test:e2e --workspace api
+
+  postgres-integration:
+    name: PostgreSQL migration and party integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: gst_billing_ci
+          POSTGRES_USER: gst_ci
+          POSTGRES_PASSWORD: synthetic-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gst_ci -d gst_billing_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://gst_ci:synthetic-ci-password@localhost:5432/gst_billing_ci
+      TEST_DATABASE_URL: postgresql://gst_ci:synthetic-ci-password@localhost:5432/gst_billing_ci
+      RUN_PARTY_POSTGRES_TESTS: '1'
+      NODE_ENV: test
+      PARTY_SERVICE_HMAC_SECRET: synthetic-party-service-ci-secret-32-bytes
+      PARTY_SERVICE_TIMEOUT_MS: '1000'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Use repository npm
+        run: npm install -g npm@11.17.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run prisma:generate --workspace api
+      - name: Deploy migrations from empty database
+        run: npm run prisma:deploy --workspace api
+      - name: Validate Prisma schema
+        run: npm run prisma:validate --workspace api
+      - name: Party service real PostgreSQL tests
+        run: npm run test:postgres --workspace party-service
+      - name: Monolith client to party-service live PostgreSQL tests
+        run: npm run test:party-postgres --workspace api
