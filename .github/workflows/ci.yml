@@ -21,14 +21,24 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Use repository npm
+      - name: Pin npm 11.17.0
         working-directory: ${{ runner.temp }}
-        run: npm install -g npm@11.17.0
+        run: |
+          npm install --prefix "$RUNNER_TEMP/npm-11.17.0" npm@11.17.0
+          echo "$RUNNER_TEMP/npm-11.17.0/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Verify toolchain
         run: |
+          echo "PATH=$PATH"
           node --version
-          npm --version
-          npm config get user-agent
+          command -v node
+          command -v npm
+          ACTUAL_NPM="$(npm --version)"
+          echo "$ACTUAL_NPM"
+          npm prefix -g
+          if [ "$ACTUAL_NPM" != "11.17.0" ]; then
+            echo "Expected npm 11.17.0 but found $ACTUAL_NPM"
+            exit 1
+          fi
       - name: Install dependencies
         run: npm ci
       - name: Lint
@@ -88,14 +98,24 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Use repository npm
+      - name: Pin npm 11.17.0
         working-directory: ${{ runner.temp }}
-        run: npm install -g npm@11.17.0
+        run: |
+          npm install --prefix "$RUNNER_TEMP/npm-11.17.0" npm@11.17.0
+          echo "$RUNNER_TEMP/npm-11.17.0/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Verify toolchain
         run: |
+          echo "PATH=$PATH"
           node --version
-          npm --version
-          npm config get user-agent
+          command -v node
+          command -v npm
+          ACTUAL_NPM="$(npm --version)"
+          echo "$ACTUAL_NPM"
+          npm prefix -g
+          if [ "$ACTUAL_NPM" != "11.17.0" ]; then
+            echo "Expected npm 11.17.0 but found $ACTUAL_NPM"
+            exit 1
+          fi
       - name: Install dependencies
         run: npm ci
       - name: Generate Prisma client
