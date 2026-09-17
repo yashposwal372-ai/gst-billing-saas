@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: npm
+          package-manager-cache: false
       - name: Pin npm 11.17.0
         working-directory: ${{ runner.temp }}
         run: |
@@ -97,7 +97,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: npm
+          package-manager-cache: false
       - name: Pin npm 11.17.0
         working-directory: ${{ runner.temp }}
         run: |
