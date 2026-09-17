@@ -22,7 +22,13 @@ jobs:
           node-version: '24'
           cache: npm
       - name: Use repository npm
+        working-directory: ${{ runner.temp }}
         run: npm install -g npm@11.17.0
+      - name: Verify toolchain
+        run: |
+          node --version
+          npm --version
+          npm config get user-agent
       - name: Install dependencies
         run: npm ci
       - name: Lint
@@ -83,7 +89,13 @@ jobs:
           node-version: '24'
           cache: npm
       - name: Use repository npm
+        working-directory: ${{ runner.temp }}
         run: npm install -g npm@11.17.0
+      - name: Verify toolchain
+        run: |
+          node --version
+          npm --version
+          npm config get user-agent
       - name: Install dependencies
         run: npm ci
       - name: Generate Prisma client
