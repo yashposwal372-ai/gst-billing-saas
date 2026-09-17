@@ -41,6 +41,8 @@ jobs:
           fi
       - name: Install dependencies
         run: npm ci
+      - name: Prepare shared Prisma client
+        run: npm run prisma:prepare
       - name: Lint
         run: npm run lint
       - name: Architecture check
@@ -118,8 +120,8 @@ jobs:
           fi
       - name: Install dependencies
         run: npm ci
-      - name: Generate Prisma client
-        run: npm run prisma:generate --workspace api
+      - name: Prepare shared Prisma client
+        run: npm run prisma:prepare
       - name: Deploy migrations from empty database
         run: npm run prisma:deploy --workspace api
       - name: Validate Prisma schema

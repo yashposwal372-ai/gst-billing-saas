@@ -19,7 +19,8 @@
     "party-service:dev": "npm run start:dev --workspace party-service",
     "party-service:build": "npm run build --workspace party-service",
     "party-service:test": "npm run test --workspace party-service",
-    "party-service:check": "npm run check --workspace party-service"
+    "party-service:check": "npm run check --workspace party-service",
+    "prisma:prepare": "npm run prisma:generate --workspace api && npm run build --workspace @gst/prisma-client"
   },
   "devDependencies": {
     "prettier": "3.9.6",
